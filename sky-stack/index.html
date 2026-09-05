@@ -5,11 +5,12 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
   <meta name="theme-color" content="#8ed8ff">
   <title>Sky Stack</title>
-  <link rel="stylesheet" href="style.css?v=2">
+  <link rel="stylesheet" href="style.css?v=3">
 </head>
 <body>
 <div id="app">
   <canvas id="game"></canvas>
+
   <div id="hud">
     <div class="height box"><small>HEIGHT</small><b id="height">0 m</b></div>
     <div class="cams">
@@ -26,6 +27,7 @@
 
   <div id="mode" class="box">MAX 1×1</div>
   <button class="btn" id="tipBtn">💡</button>
+
   <div id="tips" class="box">
     <b>💡 QUICK TIPS</b>
     <p>✋ MOVE lets you drag around safely.</p>
@@ -43,11 +45,26 @@
     <button class="slot locked" disabled><span class="blk" style="background:#77828e;display:grid;place-items:center;color:white;font-size:20px">?</span><span>???</span></button>
   </div>
 
+  <div id="overlapWarn" class="modal" aria-hidden="true">
+    <div class="modalCard box">
+      <div class="warningIcon">⚠</div>
+      <b>BLOCK COLLISION</b>
+      <p>This block overlaps one of your placed blocks.</p>
+      <p class="warningText">Placing it anyway may push, tilt, or launch your other blocks because the physics will force them apart.</p>
+      <label class="dontShow"><input type="checkbox" id="overlapDont"> <span>Don't show this again</span></label>
+      <div class="modalActions">
+        <button class="btn" id="overlapCancel">CANCEL</button>
+        <button class="btn primary" id="overlapPlace">PLACE ANYWAY</button>
+      </div>
+    </div>
+  </div>
+
   <div id="toast" class="hide"></div>
   <div id="load">Loading physics…</div>
 </div>
+
 <script src="https://cdn.jsdelivr.net/npm/matter-js@0.20.0/build/matter.min.js"></script>
 <script src="audio.js?v=2"></script>
-<script src="game.js?v=2"></script>
+<script src="game.js?v=3"></script>
 </body>
 </html>
