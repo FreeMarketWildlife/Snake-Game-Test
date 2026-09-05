@@ -1,0 +1,75 @@
+(() => {
+'use strict';
+
+const $=id=>document.getElementById(id),load=$('load');
+if(!window.Matter){load.textContent='Physics failed to load';return}
+
+const {Engine,World,Bodies,Body,Query,Sleeping}=Matter;
+const c=$('game'),ctx=c.getContext('2d');
+const B=32,H=16,DEPTH=64,TRANSITION=4;
+const DIRT_END=6,STONE_END=26,DEEPSLATE_END=54,BEDROCK_START=54;
+const SAVE_KEY='skyStack.save.v1';
+const LV2_COST=8,LV3_COST=20;
+const M={
+  dirt:{taps:1,d:.0017,f:.74,r:.13,a:.012,col:['#98633a','#81502e']},
+  stone:{taps:3,d:.0028,f:.88,r:.055,a:.009,col:['#777f89','#626a74']},
+  deepslate:{taps:6,d:.0035,f:.93,r:.025,a:.008,col:['#414651','#30343d']},
+  bedrock:{taps:Infinity,d:.005,f:1,r:0,a:.004,col:['#1d2229','#11151a']}
+};
+
+const inv={dirt:0,stone:0,deepslate:0,gold:0};
+const bs=new Set(),grid=new Map(),generated=new Set(),pointers=new Map(),miners=new Set();
+const removedTerrain=new Set(),terrainDamage=new Map(),restingMiners=[];
+const goldBursts=[];
+const cam={x:0,y:-180,z:1,tx:0,ty:-180,anim:false};
+
+let tool='pick',gesture=null,best=0,shape=false,stone=false,deepslate=false,toastTimer,minerId=0,selectedMiner=null;
+let pendingPlacement=null,restoring=false,resetting=false,lastSavedAt=0,deadMiners=0;
+let highCandidate=null;
+let overlapSuppressed=false;
+try{overlapSuppressed=localStorage.getItem('skyStack.hideOverlapWarning')==='1'}catch{}
+
+const eng=Engine.create({enableSleeping:true});
+eng.gravity.y=1.05;eng.gravity.scale=.001;
+
+let W,HH,DPR;
+const key=(a,b)=>a+','+b,cell=v=>Math.floor(v/B),ctr=i=>i*B+H,clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const finite=n=>Number.isFinite(n)?n:0;
+const normAngle=a=>Math.atan2(Math.sin(a),Math.cos(a));
+
+function resize(){W=innerWidth;HH=innerHeight;DPR=Math.min(devicePixelRatio||1,2);c.width=W*DPR;c.height=HH*DPR;c.style.width=W+'px';c.style.height=HH+'px'}
+resize();addEventListener('resize',resize,{passive:true});
+const w2s=(px,py)=>({x:(px-cam.x)*cam.z+W/2,y:(py-cam.y)*cam.z+HH/2});
+const s2w=(px,py)=>({x:(px-W/2)/cam.z+cam.x,y:(py-HH/2)/cam.z+cam.y});
+
+function hash01(x,y,salt=0){let n=Math.imul(x+salt*131,374761393)^Math.imul(y-salt*197,668265263);n=Math.imul(n^(n>>>13),1274126177);return ((n^(n>>>16))>>>0)/4294967295}
+function mixedMaterial(cx,cy,start,a,b){
+  const step=cy-start+1,p=clamp(step/(TRANSITION+1),0,1);
+  return hash01(cx,cy,11+start)<p?b:a
+}
+function terrainMaterial(cx,cy){
+  const ds=DIRT_END-Math.floor(TRANSITION/2),ss=STONE_END-Math.floor(TRANSITION/2),bs0=BEDROCK_START;
+  if(cy<ds)return 'dirt';
+  if(cy<ds+TRANSITION)return mixedMaterial(cx,cy,ds,'dirt','stone');
+  if(cy<ss)return 'stone';
+  if(cy<ss+TRANSITION)return mixedMaterial(cx,cy,ss,'stone','deepslate');
+  if(cy<bs0)return 'deepslate';
+  return 'bedrock'
+}
+function goldAt(cx,cy){
+  if(cy<1||cy>=BEDROCK_START)return 0;
+  const REGION=11,rx=Math.floor(cx/REGION),ry=Math.floor(cy/REGION);let bestInfluence=0,coreLuck=0;
+  for(let oy=-1;oy<=1;oy++)for(let ox=-1;ox<=1;ox++){
+    const gx=rx+ox,gy=ry+oy;if(hash01(gx,gy,71)>.38)continue;
+    const centerX=gx*REGION+2+Math.floor(hash01(gx,gy,72)*(REGION-4));
+    const centerY=gy*REGION+2+Math.floor(hash01(gx,gy,73)*(REGION-4));
+    const dx=cx-centerX,dy=cy-centerY,d=Math.sqrt(dx*dx+dy*dy);let influence=0;
+    if(d<=1.25)influence=.78;else if(d<=2.45)influence=.48;else if(d<=3.7)influence=.22;else if(d<=5)influence=.055;
+    if(influence>bestInfluence){bestInfluence=influence;coreLuck=hash01(centerX,centerY,74)}
+  }
+  if(bestInfluence===0&&hash01(cx,cy,75)<.004)bestInfluence=.2;
+  if(bestInfluence===0||hash01(cx,cy,76)>=bestInfluence)return 0;
+  const richness=hash01(cx,cy,77);if(bestInfluence>.6&&coreLuck>.6&&richness>.86)return 3;if(bestInfluence>.4&&richness>.72)return 2;return 1
+}
+
+function readSave(){try{const raw=localStorage.getItem(SAVE_KEY);if(!raw)return null;const s=JSON.parse(raw);return s&&s.v===1?s:null}catch(e){console.warn('Save read failed',e);return null}}
