@@ -1,4 +1,23 @@
 
+// The first terrain chunks are generated before this module's top-level assignments run.
+// Preserve the lazily-created registries instead of letting the later var initializers
+// make liquidInit rebuild them and orphan the first surface-water bodies.
+if(fluids&&fluidSeeded&&revealedPockets&&naturalOpen&&pocketCache&&wetBodies)liquidStateReady=true;
+if(!Number.isFinite(fluidId))fluidId=0;
+
+function createFluid(kind,x,y,o={}){
+  liquidInit();
+  if(!Number.isFinite(fluidId))fluidId=0;
+  const lava=kind==='lava';
+  const q=Bodies.circle(x,y,5.7,{
+    density:lava?.00042:.00016,friction:lava?.045:.008,frictionStatic:0,
+    restitution:lava?.01:.035,frictionAir:lava?.075:.022,slop:.02,sleepThreshold:lava?90:65
+  });
+  q.game={kind:'liquid',liquid:kind,id:++fluidId,born:performance.now()};
+  if(o.velocity)Body.setVelocity(q,{x:finite(o.velocity.x),y:finite(o.velocity.y)});
+  fluids.add(q);World.add(eng.world,q);return q
+}
+
 function createObsidian(x,y,o={}){
   const r=B*.36;
   const near=Query.region([...bs],{min:{x:x-r,y:y-r},max:{x:x+r,y:y+r}}).find(z=>z.game?.worldProduct&&z.game.material==='obsidian');
