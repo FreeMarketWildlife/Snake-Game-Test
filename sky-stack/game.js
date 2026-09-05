@@ -11,10 +11,10 @@ const M={
   stone:{taps:3,d:.0028,f:.88,r:.055,a:.009,col:['#777f89','#626a74']}
 };
 
-const inv={dirt:0,stone:0},bs=new Set(),grid=new Map(),generated=new Set(),pointers=new Map();
+const inv={dirt:0,stone:0},bs=new Set(),grid=new Map(),generated=new Set(),pointers=new Map(),miners=new Set();
 const cam={x:0,y:-180,z:1,tx:0,ty:-180,anim:false};
 
-let tool='pick',gesture=null,best=0,shape=false,stone=false,toastTimer;
+let tool='pick',gesture=null,best=0,shape=false,stone=false,toastTimer,minerId=0,selectedMiner=null;
 let pendingPlacement=null,overlapWarnedThisSession=false;
 let overlapSuppressed=false;
 try{overlapSuppressed=localStorage.getItem('skyStack.hideOverlapWarning')==='1'}catch{}
@@ -91,9 +91,11 @@ function toast(t,long=false){
   toastTimer=setTimeout(()=>$('toast').classList.add('hide'),long?3000:1300)
 }
 
-function buildLimit(){
-  return best<5?1:Math.min(10,2+Math.floor(Math.max(0,best-5)/10))
-}
+function buildLimitAt(h){return h<5?1:Math.min(10,2+Math.floor(Math.max(0,h-5)/10))}
+function buildLimit(){return buildLimitAt(best)}
+function minerCountAt(h){return h<20?0:1+Math.floor((h-20)/10)}
+function unlockedMiners(){return minerCountAt(best)}
+function availableMiners(){return Math.max(0,unlockedMiners()-miners.size)}
 
 function ui(){
   $('dc').textContent=inv.dirt;
@@ -101,6 +103,11 @@ function ui(){
   document.querySelector('[data-tool=dirt]').classList.toggle('empty',!inv.dirt);
   $('stoneSlot').classList.toggle('unlocked',stone);
   $('stoneSlot').classList.toggle('locked',!stone);
+  const total=unlockedMiners(),available=availableMiners();
+  $('mc').textContent=available;
+  $('minerSlot').classList.toggle('unlocked',total>0);
+  $('minerSlot').classList.toggle('locked',total===0);
+  $('minerSlot').classList.toggle('empty',total>0&&available===0);
   $('mode').textContent='MAX '+buildLimit()+'×'+buildLimit()
 }
 
@@ -108,6 +115,11 @@ function at(p){
   const a=Query.point([...bs],p);
   a.sort((a,b)=>(b.game?.born||0)-(a.game?.born||0));
   return a[0]
+}
+
+function minerAt(p){
+  const a=Query.point([...miners],p);
+  return a[0]||null
 }
 
 function wake(){
@@ -162,10 +174,7 @@ function bodiesIn(r){
 
 function placementState(r){
   const hits=bodiesIn(r);
-  return{
-    terrain:hits.some(z=>z.game.terrain),
-    placed:hits.some(z=>z.game.placed)
-  }
+  return{terrain:hits.some(z=>z.game.terrain),placed:hits.some(z=>z.game.placed)}
 }
 
 function hideOverlapWarning(){
@@ -202,19 +211,12 @@ $('overlapCancel').addEventListener('click',e=>{
   hideOverlapWarning();
   SkyAudio.ui()
 });
-
 $('overlapWarn').addEventListener('pointerdown',e=>e.stopPropagation());
 
 function attemptPlacement(r,commit){
   const state=placementState(r);
-  if(state.terrain){
-    toast('BLOCKED BY THE WORLD');
-    return
-  }
-  if(state.placed){
-    warnOverlap(commit);
-    return
-  }
+  if(state.terrain){toast('BLOCKED BY THE WORLD');return}
+  if(state.placed){warnOverlap(commit);return}
   commit()
 }
 
@@ -237,13 +239,109 @@ function solid(m,a,b){
   attemptPlacement(r,()=>{
     if(inv[m]<r.cost)return toast('NEED '+r.cost+' '+m.toUpperCase());
     inv[m]-=r.cost;
-    mk((r.minx+r.maxx+1)*B/2,(r.miny+r.maxy+1)*B/2,m,{
-      w:r.nx*B-1,h:r.ny*B-1,cost:r.cost,placed:true
-    });
+    mk((r.minx+r.maxx+1)*B/2,(r.miny+r.maxy+1)*B/2,m,{w:r.nx*B-1,h:r.ny*B-1,cost:r.cost,placed:true});
     ui();
     SkyAudio.place(m,r.cost)
   })
 }
+
+function minerDropPoint(p){
+  const halfW=B*.34,halfH=B*.42;
+  let y=p.y;
+  for(let i=0;i<10;i++){
+    const hits=Query.region([...bs],{min:{x:p.x-halfW,y:y-halfH},max:{x:p.x+halfW,y:y+halfH}});
+    if(!hits.length)return{x:p.x,y};
+    y-=B
+  }
+  return{x:p.x,y}
+}
+
+function placeMiner(p){
+  if(unlockedMiners()<1)return toast('🔒 LEVEL 1 MINER UNLOCKS AT 20 m',true);
+  if(availableMiners()<1)return toast('ALL YOUR MINERS ARE WORKING\nTap one to give him a break.',true);
+  const drop=minerDropPoint(p);
+  const q=Bodies.rectangle(drop.x,drop.y,B*.66,B*.80,{
+    density:.00125,friction:.88,frictionStatic:.95,restitution:.02,frictionAir:.025,
+    chamfer:{radius:2},sleepThreshold:100
+  });
+  q.game={
+    kind:'miner',level:1,id:++minerId,dir:Math.random()<.5?-1:1,
+    nextMine:performance.now()+700+Math.random()*300,
+    nextTurn:performance.now()+800+Math.random()*1200,
+    pickUntil:0
+  };
+  miners.add(q);
+  World.add(eng.world,q);
+  ui();
+  SkyAudio.ui();
+  toast('LEVEL 1 MINER DEPLOYED ⛏')
+}
+
+function mineableNear(q){
+  const r=B*1.18;
+  return Query.region([...bs],{
+    min:{x:q.position.x-r,y:q.position.y-r},
+    max:{x:q.position.x+r,y:q.position.y+r}
+  }).filter(z=>z.game?.terrain&&z.game.material==='dirt')
+}
+
+function updateMiners(now){
+  for(const q of miners){
+    const g=q.game;
+    Sleeping.set(q,false);
+    if(now>=g.nextTurn){
+      g.dir=Math.random()<.5?-1:1;
+      g.nextTurn=now+900+Math.random()*1700
+    }
+    if(now>=g.nextMine){
+      const targets=mineableNear(q);
+      if(targets.length){
+        const target=targets[Math.floor(Math.random()*targets.length)];
+        const dx=target.position.x-q.position.x;
+        if(Math.abs(dx)>4)g.dir=Math.sign(dx);
+        g.pickUntil=now+240;
+        remove(target)
+      }
+      g.nextMine=now+900+Math.random()*200
+    }
+    const desired=g.dir*.48;
+    const vx=clamp(q.velocity.x*.72+desired*.28,-.8,.8);
+    Body.setVelocity(q,{x:vx,y:q.velocity.y})
+  }
+}
+
+function openMinerMenu(q){
+  if(!miners.has(q))return;
+  selectedMiner=q;
+  $('minerMenu').classList.add('show');
+  $('minerMenu').setAttribute('aria-hidden','false');
+  SkyAudio.ui()
+}
+
+function closeMinerMenu(){
+  selectedMiner=null;
+  $('minerMenu').classList.remove('show');
+  $('minerMenu').setAttribute('aria-hidden','true')
+}
+
+$('minerBreak').addEventListener('click',e=>{
+  e.stopPropagation();
+  if(selectedMiner&&miners.has(selectedMiner)){
+    World.remove(eng.world,selectedMiner);
+    miners.delete(selectedMiner);
+    toast('MINER IS TAKING A BREAK ☕');
+    ui()
+  }
+  closeMinerMenu();
+  SkyAudio.ui()
+});
+
+$('minerKeep').addEventListener('click',e=>{
+  e.stopPropagation();
+  closeMinerMenu();
+  SkyAudio.ui()
+});
+$('minerMenu').addEventListener('pointerdown',e=>e.stopPropagation());
 
 $('bar').addEventListener('click',e=>{
   e.stopPropagation();
@@ -251,7 +349,12 @@ $('bar').addEventListener('click',e=>{
   if(!b)return;
   const t=b.dataset.tool;
   if(t==='stone'&&!stone)return toast('🔒 STONE UNLOCKS AT 10 m',true);
-  if(t!=='pick'&&t!=='move'&&!inv[t])return toast('MINE '+t.toUpperCase()+' FIRST');
+  if(t==='miner'){
+    if(unlockedMiners()<1)return toast('🔒 LEVEL 1 MINER UNLOCKS AT 20 m',true);
+    if(availableMiners()<1)return toast('ALL YOUR MINERS ARE WORKING\nTap one to give him a break.',true)
+  }else if(t!=='pick'&&t!=='move'&&!inv[t]){
+    return toast('MINE '+t.toUpperCase()+' FIRST')
+  }
   tool=t;
   document.querySelectorAll('.slot').forEach(s=>s.classList.toggle('sel',s===b));
   SkyAudio.ui();
@@ -299,9 +402,17 @@ function end(e){
   if(!gesture||gesture.id!==e.pointerId)return;
   const g=gesture;
   gesture=null;
+  if(!g.moved){
+    const worker=minerAt(g.b);
+    if(worker){openMinerMenu(worker);return}
+  }
   if(g.t==='move')return;
   if(g.t==='pick'){
     if(!g.moved)mine(g.b);
+    return
+  }
+  if(g.t==='miner'){
+    if(!g.moved)placeMiner(g.b);
     return
   }
   if(!g.moved)one(g.t,g.b);
@@ -329,9 +440,7 @@ function meters(){
   return p?Math.max(0,Math.round(-Math.min(0,p.y)/B)):0
 }
 
-function go(p){
-  cam.tx=p.x;cam.ty=p.y;cam.anim=true
-}
+function go(p){cam.tx=p.x;cam.ty=p.y;cam.anim=true}
 
 function frontier(){
   const cx=cell(cam.x);
@@ -348,35 +457,43 @@ $('top').onclick=()=>{
   go(p||{x:cam.x,y:-16});
   SkyAudio.ui()
 };
+$('down').onclick=()=>{go(frontier());SkyAudio.ui()};
 
-$('down').onclick=()=>{
-  go(frontier());
-  SkyAudio.ui()
-};
+function nextMinerMilestone(){
+  if(best<20)return 20;
+  return 20+(Math.floor((best-20)/10)+1)*10
+}
 
 function quest(){
-  const lim=buildLimit();
   if(best<5){
     $('questTitle').textContent='Reach 5 m';
-    $('questSub').textContent='Unlock 2×2 solid building'
-  }else if(best<10){
-    $('questTitle').textContent='Reach 10 m';
-    $('questSub').textContent='Unlock STONE mining'
-  }else if(lim<10){
-    const n=5+(lim-1)*10;
-    $('questTitle').textContent='Reach '+n+' m';
-    $('questSub').textContent='Unlock '+(lim+1)+'×'+(lim+1)+' building'
-  }else{
-    $('questTitle').textContent='Keep climbing';
-    $('questSub').textContent='What is up there?'
+    $('questSub').textContent='Unlock 2×2 solid building';
+    return
   }
+  if(best<10){
+    $('questTitle').textContent='Reach 10 m';
+    $('questSub').textContent='Unlock STONE mining';
+    return
+  }
+  const goals=[];
+  const lim=buildLimit();
+  if(lim<10){
+    const h=5+(lim-1)*10;
+    goals.push({h,title:'Reach '+h+' m',sub:'Unlock '+(lim+1)+'×'+(lim+1)+' building'})
+  }
+  const mh=nextMinerMilestone();
+  goals.push({h:mh,title:'Reach '+mh+' m',sub:'Unlock +1 Level 1 miner'});
+  goals.sort((a,b)=>a.h-b.h);
+  const g=goals[0];
+  $('questTitle').textContent=g.title;
+  $('questSub').textContent=g.sub
 }
 
 function progress(){
   const m=meters();
   $('height').textContent=m+' m';
   if(m>best){
-    const old=best,oldLim=buildLimit();
+    const old=best,oldLim=buildLimitAt(old),oldMinerCount=minerCountAt(old);
     best=m;
     if(old<5&&best>=5){
       shape=true;
@@ -390,6 +507,11 @@ function progress(){
     }
     if(buildLimit()>oldLim&&old>=5){
       toast('★ BUILD SIZE UPGRADED! ★\nMAX '+buildLimit()+'×'+buildLimit(),true);
+      SkyAudio.unlock()
+    }
+    const gained=minerCountAt(best)-oldMinerCount;
+    if(gained>0){
+      toast('★ MINER UNLOCKED! ★\n+'+gained+' LEVEL 1 MINER'+(gained>1?'S':'')+' ⛏',true);
       SkyAudio.unlock()
     }
     ui();
@@ -462,6 +584,50 @@ function draw(z){
   ctx.restore()
 }
 
+function drawMiner(q,now){
+  const s=w2s(q.position.x,q.position.y),w=B*.66*cam.z,h=B*.80*cam.z;
+  if(s.x+w<0||s.x-w>W||s.y+h<0||s.y-h>HH)return;
+  const flip=q.game.dir<0?-1:1;
+  ctx.save();
+  ctx.translate(s.x,s.y);
+  ctx.rotate(q.angle);
+  ctx.scale(flip,1);
+  ctx.lineWidth=Math.max(1,2*cam.z);
+  ctx.strokeStyle='#243247';
+
+  ctx.fillStyle='#26384b';
+  ctx.fillRect(-w*.30,h*.27,w*.22,h*.18);
+  ctx.fillRect(w*.08,h*.27,w*.22,h*.18);
+
+  ctx.fillStyle='#3c75a6';
+  ctx.fillRect(-w*.34,-h*.05,w*.68,h*.36);
+  ctx.strokeRect(-w*.34,-h*.05,w*.68,h*.36);
+
+  ctx.fillStyle='#f0b78d';
+  ctx.fillRect(-w*.29,-h*.35,w*.58,h*.34);
+  ctx.strokeRect(-w*.29,-h*.35,w*.58,h*.34);
+
+  ctx.fillStyle='#f0c84c';
+  ctx.fillRect(-w*.36,-h*.46,w*.72,h*.14);
+  ctx.fillRect(-w*.27,-h*.54,w*.54,h*.11);
+  ctx.strokeRect(-w*.36,-h*.46,w*.72,h*.14);
+
+  ctx.fillStyle='#243247';
+  const eye=Math.max(1,2.1*cam.z);
+  ctx.fillRect(w*.02,-h*.22,eye,eye);
+  ctx.fillRect(w*.18,-h*.22,eye,eye);
+
+  if(now<q.game.pickUntil){
+    ctx.strokeStyle='#5c3d2b';
+    ctx.lineWidth=Math.max(2,2.2*cam.z);
+    ctx.beginPath();ctx.moveTo(w*.25,-h*.03);ctx.lineTo(w*.62,-h*.42);ctx.stroke();
+    ctx.strokeStyle='#9aa1aa';
+    ctx.lineWidth=Math.max(2,2.5*cam.z);
+    ctx.beginPath();ctx.moveTo(w*.43,-h*.46);ctx.lineTo(w*.73,-h*.33);ctx.stroke()
+  }
+  ctx.restore()
+}
+
 function preview(){
   if(!gesture||!M[gesture.t]||!shape||!gesture.moved)return;
   const r=rect(gesture.a,gesture.b,buildLimit());
@@ -475,8 +641,9 @@ function preview(){
   ctx.fillText(r.nx+'×'+r.ny+' · '+r.cost,a.x+5,a.y+16)
 }
 
-function loop(){
+function loop(now){
   Engine.update(eng,16.67);
+  updateMiners(now||performance.now());
   if(cam.anim){
     cam.x+=(cam.tx-cam.x)*.12;
     cam.y+=(cam.ty-cam.y)*.12;
@@ -487,6 +654,7 @@ function loop(){
   ctx.setTransform(DPR,0,0,DPR,0,0);
   bg();
   for(const z of bs)draw(z);
+  for(const q of miners)drawMiner(q,now||performance.now());
   preview();
   requestAnimationFrame(loop)
 }
