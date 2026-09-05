@@ -1,0 +1,60 @@
+
+// --- v15 LIQUID DIAGNOSTIC / DIRECT RENDER ---------------------------------------
+// Draw reservoirs straight from the deterministic pocket map in the main frame.
+// This bypasses Matter/render-order issues and makes liquid visibility guaranteed.
+
+var SKY_BUILD='v15';
+
+(function installBuildBadge(){
+  const app=document.getElementById('app');if(!app||document.getElementById('skyBuildBadge'))return;
+  const b=document.createElement('div');b.id='skyBuildBadge';b.textContent=SKY_BUILD;
+  Object.assign(b.style,{position:'absolute',right:'10px',top:'178px',zIndex:'20',padding:'3px 5px',border:'2px solid #25374b',borderRadius:'5px',background:'#fff9e9',color:'#203044',font:'900 8px ui-monospace,monospace',pointerEvents:'none',opacity:'.82'});
+  app.appendChild(b)
+})();
+
+function drawMappedLiquids(now){
+  liquidInit();
+  const left=cam.x-W/(2*cam.z),right=cam.x+W/(2*cam.z);
+  const minCh=Math.floor(left/(24*B))-1,maxCh=Math.floor(right/(24*B))+1;
+  for(let ch=minCh;ch<=maxCh;ch++)for(const d of pocketDefs(ch)){
+    // Once an underground pocket has actually been opened, let the physics liquid own the visuals.
+    if(!d.surface&&revealedPockets.has(d.id))continue;
+    const lava=d.kind==='lava';
+    for(const [cx,cy] of d.cells){
+      const s=w2s(ctr(cx),ctr(cy)),sz=B*cam.z;
+      if(s.x+sz/2<0||s.x-sz/2>W||s.y+sz/2<0||s.y-sz/2>HH)continue;
+      ctx.save();
+      ctx.globalAlpha=lava?.93:.88;
+      ctx.fillStyle=lava?'#f15a24':'#178fe5';
+      ctx.fillRect(s.x-sz/2,s.y-sz/2,sz,sz);
+      ctx.globalAlpha=lava?.95:.72;
+      ctx.fillStyle=lava?'#ffd34f':'#8ed8ff';
+      ctx.fillRect(s.x-sz/2+sz*.08,s.y-sz/2+sz*.08,sz*.84,Math.max(3,sz*.17));
+      if(lava){
+        const p=(Math.sin(now/150+cx*.7+cy*.4)+1)*.5;
+        ctx.globalAlpha=.45+p*.25;ctx.fillStyle='#ff9d32';
+        ctx.fillRect(s.x-sz*.30,s.y-sz*.02,sz*.60,Math.max(2,sz*.12));
+      }
+      ctx.restore()
+    }
+  }
+}
+
+// Reassign the hoisted main loop before part3 reaches its startup call.
+loop=function(now){
+  const t=now||performance.now();
+  Engine.update(eng,16.67);
+  updateMiners(t);
+  if(cam.anim){cam.x+=(cam.tx-cam.x)*.12;cam.y+=(cam.ty-cam.y)*.12;if(Math.abs(cam.tx-cam.x)<.3&&Math.abs(cam.ty-cam.y)<.3)cam.anim=false}
+  ensureWorld();progress(t);
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  bg();
+  for(const z of bs)draw(z);
+  drawMappedLiquids(t);
+  for(const q of miners)drawMiner(q,t);
+  drawGoldBursts(t);preview();
+  requestAnimationFrame(loop)
+};
+
+// Useful for debugging from a browser console if needed.
+window.__skyStackLiquidDebug=()=>({build:SKY_BUILD,fluids:fluids?.size||0,generated:[...generated],seeded:fluidSeeded?[...fluidSeeded]:[],revealed:revealedPockets?[...revealedPockets]:[]});
