@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-let ac, music, sfx, ready=false, timer=null, next=0, bar=0;
+let ac, music, sfx, ready=false, timer=null, next=0, bar=0,lastSplash=0,lastSizzle=0;
 const BPM=76, beat=60/BPM, barLen=beat*4;
 const chords=[
 [62,66,69,76],[61,64,69,71],[59,62,66,69],[55,59,62,66],
@@ -18,15 +18,26 @@ function playBar(i,t){const c=chords[i],p=[-.5,-.16,.16,.5];c.forEach((n,j)=>pad
 function schedule(){if(!ready||ac.state!=='running')return;while(next<ac.currentTime+.8){playBar(bar,next);next+=barLen;bar=(bar+1)%chords.length}}
 function start(){clearInterval(timer);next=ac.currentTime+.08;bar=0;timer=setInterval(schedule,90);schedule()}
 function tone(freq,d=.08,v=.08,type='triangle',slide=0){if(!ready)return;const t=ac.currentTime,o=ac.createOscillator(),g=ac.createGain();o.type=type;o.frequency.setValueAtTime(freq,t);if(slide)o.frequency.exponentialRampToValueAtTime(slide,t+d);env(g,t,.004,v,d);o.connect(g);g.connect(sfx);o.start(t);o.stop(t+d+.03)}
+function noise(d=.18,v=.04,cut=1800){if(!ready)return;const len=Math.max(1,Math.floor(ac.sampleRate*d)),buf=ac.createBuffer(1,len,ac.sampleRate),data=buf.getChannelData(0);for(let i=0;i<len;i++)data[i]=(Math.random()*2-1)*(1-i/len);const src=ac.createBufferSource(),f=ac.createBiquadFilter(),g=ac.createGain(),t=ac.currentTime;src.buffer=buf;f.type='lowpass';f.frequency.value=cut;env(g,t,.006,v,d);src.connect(f);f.connect(g);g.connect(sfx);src.start(t);src.stop(t+d+.02)}
 function hit(material,broken=false,n=1){
- if(material==='deepslate'){const f=[250,225,205,185,168,150][Math.min(5,n-1)];tone(f,broken?.19:.11,broken?.14:.085,'triangle',f*.58);tone(f*.62,.10,.045,'sine',f*.45);if(broken)tone(82,.24,.1,'triangle',50)}
+ if(material==='obsidian'){const f=[205,190,176,162,150,140,130,120,112,104][Math.min(9,n-1)];tone(f,broken?.22:.105,broken?.15:.075,'triangle',f*.64);tone(f*2.2,.045,.018,'square',f*1.4);if(broken){tone(68,.28,.12,'triangle',43);noise(.13,.025,700)}}
+ else if(material==='deepslate'){const f=[250,225,205,185,168,150][Math.min(5,n-1)];tone(f,broken?.19:.11,broken?.14:.085,'triangle',f*.58);tone(f*.62,.10,.045,'sine',f*.45);if(broken)tone(82,.24,.1,'triangle',50)}
  else if(material==='stone'){const f=[360,315,270][Math.min(2,n-1)];tone(f,broken?.16:.09,broken?.12:.075,'triangle',f*.7);tone(f*1.5,.055,.025,'sine');if(broken)tone(130,.17,.08,'triangle',80)}
  else{const r=.92+Math.random()*.16;tone(120*r,broken?.12:.075,broken?.1:.07,'triangle',72*r);if(broken)tone(250*r,.06,.035,'square',140*r)}
 }
 function place(material,cost=1){const w=Math.min(1,Math.log2(cost+1)/3),b=material==='deepslate'?64:material==='stone'?78:98;tone(b-w*10,.14,.08+w*.03,'triangle',46);tone(material==='deepslate'?165:material==='stone'?220:285,.055,.025,'sine')}
 function unlock(){if(!ready)return;const t=ac.currentTime;[74,78,81,86].forEach((n,i)=>osc(hz(n),t+i*.085,.5,.06,'sine',sfx,(i-1.5)*.15));tone(110,.25,.055,'sine',82)}
 function ui(){tone(680,.035,.02,'sine')}
+function splash(kind='water'){
+ if(!ready)return;const now=performance.now();if(now-lastSplash<180)return;lastSplash=now;
+ if(kind==='lava'){tone(92,.24,.055,'triangle',64);tone(138,.16,.025,'sine',95);noise(.12,.016,520)}
+ else{tone(410,.10,.027,'sine',285);tone(255,.16,.035,'sine',185);noise(.07,.012,2400)}
+}
+function sizzle(){
+ if(!ready)return;const now=performance.now();if(now-lastSizzle<120)return;lastSizzle=now;
+ noise(.24,.052,3200);tone(185,.16,.035,'triangle',92);setTimeout(()=>tone(760,.045,.018,'sine',520),45)
+}
 async function ensure(){if(ready){if(ac.state==='suspended')try{await ac.resume()}catch{};return}try{if(navigator.audioSession&&'type'in navigator.audioSession)navigator.audioSession.type='playback';const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;ac=new AC();const master=ac.createGain(),comp=ac.createDynamicsCompressor();music=ac.createGain();sfx=ac.createGain();master.gain.value=.8;music.gain.value=.42;sfx.gain.value=.95;music.connect(master);sfx.connect(master);master.connect(comp);comp.connect(ac.destination);await ac.resume();ready=true;start()}catch(e){console.warn('Audio start failed',e)}}
 document.addEventListener('pointerdown',ensure,{capture:true});document.addEventListener('keydown',ensure,{capture:true});document.addEventListener('visibilitychange',()=>{if(document.hidden){clearInterval(timer);timer=null}else if(ready)ac.resume().then(start).catch(()=>{})});
-window.SkyAudio={ensure,hit,place,unlock,ui};
+window.SkyAudio={ensure,hit,place,unlock,ui,splash,sizzle};
 })();
