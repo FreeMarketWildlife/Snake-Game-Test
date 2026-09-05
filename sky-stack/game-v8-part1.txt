@@ -76,11 +76,9 @@ function terrainExposed(z){
   if(!z?.game?.terrain)return true;
   const cx=z.game.cx,cy=z.game.cy;
   if(cy===0)return true;
-  return [[0,-1],[1,0],[0,1],[-1,0]].some(([dx,dy])=>{
-    const nx=cx+dx,ny=cy+dy;
-    if(ny<0)return true;
-    if(ny>=DEPTH)return false;
-    return removedTerrain.has(key(nx,ny))
-  })
+  if(removedTerrain.has(key(cx,cy-1)))return true;
+  if(removedTerrain.has(key(cx+1,cy)))return true;
+  if(cy+1<DEPTH&&removedTerrain.has(key(cx,cy+1)))return true;
+  return removedTerrain.has(key(cx-1,cy))
 }
 function harvest(z,collector='player',miner=null){
