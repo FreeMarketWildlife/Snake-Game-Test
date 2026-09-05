@@ -1,0 +1,75 @@
+  if(z.game.material==='bedrock')return 0;
+  inv[z.game.material]=(inv[z.game.material]||0)+(z.game.cost||1);let gold=0;
+  if(z.game.terrain){
+    const k=key(z.game.cx,z.game.cy);gold=goldAt(z.game.cx,z.game.cy);grid.delete(k);removedTerrain.add(k);terrainDamage.delete(k);
+    if(z.game.material==='deepslate'&&!deepslate){deepslate=true;toast('★ DEEPSLATE DISCOVERED! ★',true);SkyAudio.unlock()}
+    if(gold>0){goldBurst(z.position.x,z.position.y,gold,collector==='miner');if(collector==='miner'&&miner){miner.game.gold+=gold;toast('YOUR MINER FOUND GOLD...\nAND POCKETED IT 👀',true)}else{inv.gold+=gold;toast('★ GOLD! +'+gold+' ★',true)}}
+  }
+  bs.delete(z);World.remove(eng.world,z);wake();ui();saveSoon();return gold
+}
+function mine(p){
+  const z=at(p);if(!z)return;
+  if(z.game.material==='bedrock'){toast('BEDROCK WON’T BUDGE.');return}
+  if(z.game.material==='stone'&&!stone){toast('🔒 STONE LOCKED\nReach 10 m first!',true);return}
+  z.game.hits++;z.game.flash=7;if(z.game.terrain)terrainDamage.set(key(z.game.cx,z.game.cy),z.game.hits);
+  const broken=z.game.hits>=z.game.max;SkyAudio.hit(z.game.material,broken,z.game.hits);if(broken)harvest(z,'player');else saveSoon()
+}
+
+function rect(a,b,limit=Infinity){const ax=cell(a.x),ay=cell(a.y);let bx=cell(b.x),by=cell(b.y);if(Number.isFinite(limit)){bx=ax+clamp(bx-ax,-(limit-1),limit-1);by=ay+clamp(by-ay,-(limit-1),limit-1)}const minx=Math.min(ax,bx),maxx=Math.max(ax,bx),miny=Math.min(ay,by),maxy=Math.max(ay,by);return{minx,maxx,miny,maxy,nx:maxx-minx+1,ny:maxy-miny+1,cost:(maxx-minx+1)*(maxy-miny+1)}}
+function bodiesIn(r){return Query.region([...bs],{min:{x:r.minx*B+2,y:r.miny*B+2},max:{x:(r.maxx+1)*B-2,y:(r.maxy+1)*B-2}}).filter(z=>z.game)}
+function placementState(r){const hits=bodiesIn(r);return{terrain:hits.some(z=>z.game.terrain),placed:hits.some(z=>z.game.placed)}}
+function hideOverlapWarning(){$('overlapWarn').classList.remove('show');$('overlapWarn').setAttribute('aria-hidden','true')}
+function warnOverlap(commit){if(overlapSuppressed){commit();return}pendingPlacement=commit;$('overlapDont').checked=false;$('overlapWarn').classList.add('show');$('overlapWarn').setAttribute('aria-hidden','false');SkyAudio.ui()}
+$('overlapPlace').addEventListener('click',e=>{e.stopPropagation();if($('overlapDont').checked){overlapSuppressed=true;try{localStorage.setItem('skyStack.hideOverlapWarning','1')}catch{}}const commit=pendingPlacement;pendingPlacement=null;hideOverlapWarning();SkyAudio.ui();if(commit)commit()});
+$('overlapCancel').addEventListener('click',e=>{e.stopPropagation();pendingPlacement=null;hideOverlapWarning();SkyAudio.ui()});$('overlapWarn').addEventListener('pointerdown',e=>e.stopPropagation());
+function attemptPlacement(r,commit){const state=placementState(r);if(state.terrain){toast('BLOCKED BY THE WORLD');return}if(state.placed){warnOverlap(commit);return}commit()}
+function one(m,p){if(!inv[m])return toast('NO '+m.toUpperCase()+' — MINE SOME!');const r={minx:cell(p.x),maxx:cell(p.x),miny:cell(p.y),maxy:cell(p.y)};attemptPlacement(r,()=>{if(!inv[m])return;inv[m]--;mk(ctr(r.minx),ctr(r.miny),m,{placed:true});ui();SkyAudio.place(m,1);saveSoon()})}
+function solid(m,a,b){const r=rect(a,b,buildLimit());if(r.cost===1)return one(m,b);if(inv[m]<r.cost)return toast('NEED '+r.cost+' '+m.toUpperCase());attemptPlacement(r,()=>{if(inv[m]<r.cost)return;inv[m]-=r.cost;mk((r.minx+r.maxx+1)*B/2,(r.miny+r.maxy+1)*B/2,m,{w:r.nx*B-1,h:r.ny*B-1,cost:r.cost,placed:true});ui();SkyAudio.place(m,r.cost);saveSoon()})}
+
+function minerDropPoint(p){const halfW=B*.34,halfH=B*.42;let y=p.y;for(let i=0;i<10;i++){const hits=Query.region([...bs],{min:{x:p.x-halfW,y:y-halfH},max:{x:p.x+halfW,y:y+halfH}});if(!hits.length)return{x:p.x,y};y-=B}return{x:p.x,y}}
+function placeMiner(p){
+  if(unlockedMiners()<1)return toast('🔒 LEVEL 1 MINER UNLOCKS AT 20 m',true);if(availableMiners()<1)return toast('NO MINERS AVAILABLE\nWorking miners can be returned.',true);
+  restingMiners.sort((a,b)=>b.level-a.level);const data=restingMiners.shift(),drop=minerDropPoint(p);createMinerAt(drop.x,drop.y,{id:data.id,level:data.level,gold:data.gold,dir:Math.random()<.5?-1:1});ui();SkyAudio.ui();toast('LEVEL '+data.level+' MINER DEPLOYED ⛏');saveSoon()
+}
+function minerMaterial(q){return q.game.level===1?'dirt':q.game.level===2?'stone':'deepslate'}
+function mineableNear(q){const r=B*1.18,m=minerMaterial(q);return Query.region([...bs],{min:{x:q.position.x-r,y:q.position.y-r},max:{x:q.position.x+r,y:q.position.y+r}}).filter(z=>z.game?.terrain&&z.game.material===m)}
+function minerHit(q,target){if(target.game.material==='bedrock')return;target.game.hits++;target.game.flash=5;terrainDamage.set(key(target.game.cx,target.game.cy),target.game.hits);SkyAudio.hit(target.game.material,target.game.hits>=target.game.max,target.game.hits);if(target.game.hits>=target.game.max)harvest(target,'miner',q);else saveSoon()}
+function selfRightMiner(q,now){
+  const g=q.game,speed=Math.hypot(q.velocity.x,q.velocity.y),ang=Math.abs(normAngle(q.angle));
+  if(speed<.35&&Math.abs(q.angularVelocity)<.12){if(!g.uprightSince)g.uprightSince=now;if(now-g.uprightSince>260&&ang>.035){const err=-normAngle(q.angle);Body.setAngularVelocity(q,clamp(q.angularVelocity*.45+err*.09,-.18,.18));if(ang<.09)Body.setAngle(q,q.angle*.78)}}else g.uprightSince=0
+}
+function updateMiners(now){
+  for(const q of miners){
+    const g=q.game;Sleeping.set(q,false);selfRightMiner(q,now);
+    if(now>=g.nextTurn){g.dir=Math.random()<.5?-1:1;g.nextTurn=now+900+Math.random()*1700}
+    if(now>=g.nextMine){const targets=mineableNear(q);if(targets.length){const target=targets[Math.floor(Math.random()*targets.length)],dx=target.position.x-q.position.x;if(Math.abs(dx)>4)g.dir=Math.sign(dx);g.pickUntil=now+240;minerHit(q,target)}g.nextMine=now+900+Math.random()*200}
+    const desired=g.dir*.48,vx=clamp(q.velocity.x*.72+desired*.28,-.8,.8);Body.setVelocity(q,{x:vx,y:q.velocity.y})
+  }
+}
+
+function upgradeText(q){if(q.game.level===1)return 'UPGRADE TO LEVEL 2 · '+LV2_COST+' GOLD';if(q.game.level===2)return 'UPGRADE TO LEVEL 3 · '+LV3_COST+' GOLD';return 'MAX LEVEL'}
+function refreshMinerMenu(){
+  if(!selectedMiner||!miners.has(selectedMiner))return;const g=selectedMiner.game;$('minerTitle').textContent='LEVEL '+g.level+' MINER';$('minerGold').textContent='POCKETED GOLD: '+g.gold;
+  $('minerDesc').textContent=g.level===1?'He mines dirt. Hidden gold goes in his pocket.':g.level===2?'He mines stone. Hidden gold still goes in his pocket.':'He mines deepslate. Bedrock stops him cold.';
+  const cost=g.level===1?LV2_COST:g.level===2?LV3_COST:Infinity;$('minerUpgrade').textContent=upgradeText(selectedMiner);$('minerUpgrade').disabled=g.level>=3||inv.gold<cost;
+  $('minerUpgradeHint').textContent=g.level>=3?'This miner is fully upgraded.':inv.gold>=cost?'Spend '+cost+' gold to upgrade this miner.':'Need '+cost+' gold. You have '+inv.gold+'.';
+  $('minerKill').textContent='KILL MINER · CLAIM '+g.gold+' GOLD'
+}
+function openMinerMenu(q){if(!miners.has(q))return;selectedMiner=q;refreshMinerMenu();$('minerMenu').classList.add('show');$('minerMenu').setAttribute('aria-hidden','false');SkyAudio.ui()}
+function closeMinerMenu(){selectedMiner=null;$('minerMenu').classList.remove('show');$('minerMenu').setAttribute('aria-hidden','true')}
+$('minerBreak').addEventListener('click',e=>{e.stopPropagation();if(selectedMiner&&miners.has(selectedMiner)){const g=selectedMiner.game;restingMiners.push({id:g.id,level:g.level,gold:g.gold});World.remove(eng.world,selectedMiner);miners.delete(selectedMiner);toast('MINER RETURNED ↩');ui();saveSoon()}closeMinerMenu();SkyAudio.ui()});
+$('minerKeep').addEventListener('click',e=>{e.stopPropagation();closeMinerMenu();SkyAudio.ui()});
+$('minerUpgrade').addEventListener('click',e=>{e.stopPropagation();if(!selectedMiner||!miners.has(selectedMiner))return;const g=selectedMiner.game,cost=g.level===1?LV2_COST:g.level===2?LV3_COST:Infinity;if(g.level>=3)return;if(inv.gold<cost){toast('NEED '+cost+' GOLD');refreshMinerMenu();return}inv.gold-=cost;g.level++;ui();refreshMinerMenu();SkyAudio.unlock();toast('★ LEVEL '+g.level+' MINER! ★\n'+(g.level===2?'STONE':'DEEPSLATE')+' SPECIALIST',true);saveSoon()});
+$('minerKill').addEventListener('click',e=>{e.stopPropagation();if(!selectedMiner||!miners.has(selectedMiner))return;$('killGold').textContent=selectedMiner.game.gold;$('killModal').classList.add('show');$('killModal').setAttribute('aria-hidden','false');SkyAudio.ui()});
+$('minerMenu').addEventListener('pointerdown',e=>e.stopPropagation());
+$('killCancel').addEventListener('click',e=>{e.stopPropagation();$('killModal').classList.remove('show');$('killModal').setAttribute('aria-hidden','true');SkyAudio.ui()});
+$('killConfirm').addEventListener('click',e=>{e.stopPropagation();if(selectedMiner&&miners.has(selectedMiner)){const loot=selectedMiner.game.gold;inv.gold+=loot;World.remove(eng.world,selectedMiner);miners.delete(selectedMiner);deadMiners++;ui();saveSoon();toast(loot?'MINER GONE. +'+loot+' GOLD 💰':'MINER GONE.',true)}$('killModal').classList.remove('show');$('killModal').setAttribute('aria-hidden','true');closeMinerMenu();SkyAudio.ui()});
+$('killModal').addEventListener('pointerdown',e=>e.stopPropagation());
+
+$('bar').addEventListener('click',e=>{
+  e.stopPropagation();const b=e.target.closest('.slot[data-tool]');if(!b)return;const t=b.dataset.tool;
+  if(t==='stone'&&!stone)return toast('🔒 STONE UNLOCKS AT 10 m',true);
+  if(t==='deepslate'&&!deepslate)return toast('🔒 FIND DEEPSLATE UNDERGROUND FIRST',true);
+  if(t==='miner'){if(unlockedMiners()<1)return toast('🔒 LEVEL 1 MINER UNLOCKS AT 20 m',true);if(availableMiners()<1)return toast('NO MINERS AVAILABLE\nWorking miners can be returned.',true)}
+  else if(t!=='pick'&&t!=='move'&&!inv[t])return toast('MINE '+t.toUpperCase()+' FIRST');
+  tool=t;document.querySelectorAll('.slot').forEach(s=>s.classList.toggle('sel',s===b));SkyAudio.ui();ui()
