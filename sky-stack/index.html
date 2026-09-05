@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
   <meta name="theme-color" content="#8ed8ff">
   <title>Sky Stack</title>
-  <link rel="stylesheet" href="style.css?v=4">
+  <link rel="stylesheet" href="style.css?v=5">
 </head>
 <body>
 <div id="app">
@@ -35,6 +35,10 @@
     <p>▲ TOP follows your highest build. ▼ DOWN follows your mine.</p>
     <p>Keep climbing to discover new building abilities, helpers, and materials.</p>
     <small>No spoilers — experiment with weight and support.</small>
+    <div class="saveNote">💾 Your world saves automatically on this device.</div>
+    <div class="resetSection">
+      <button class="resetLink" id="restartWorld">↻ RESTART WORLD</button>
+    </div>
   </div>
 
   <div id="bar">
@@ -75,12 +79,26 @@
     </div>
   </div>
 
+  <div id="restartModal" class="modal" aria-hidden="true">
+    <div class="modalCard box restartCard">
+      <div class="warningIcon">↻</div>
+      <b>RESTART SKY STACK?</b>
+      <p>This permanently deletes this world's locally saved progress in this browser.</p>
+      <p class="warningText">Your mined terrain, inventory, placed blocks, height progress, and deployed miners will all reset to the beginning.</p>
+      <label class="dontShow restartAgree"><input type="checkbox" id="restartAgree"> <span>I understand my saved world will be deleted.</span></label>
+      <div class="modalActions">
+        <button class="btn" id="restartCancel">KEEP MY WORLD</button>
+        <button class="btn danger" id="restartConfirm" disabled>YES, START OVER</button>
+      </div>
+    </div>
+  </div>
+
   <div id="toast" class="hide"></div>
   <div id="load">Loading physics…</div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/matter-js@0.20.0/build/matter.min.js"></script>
 <script src="audio.js?v=2"></script>
-<script src="game.js?v=5"></script>
+<script src="game.js?v=6"></script>
 </body>
 </html>
