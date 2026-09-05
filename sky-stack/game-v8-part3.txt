@@ -1,0 +1,70 @@
+});
+
+$('tipBtn').onclick=e=>{e.stopPropagation();$('tips').classList.toggle('show');SkyAudio.ui()};
+$('restartWorld').addEventListener('click',e=>{e.stopPropagation();$('tips').classList.remove('show');$('restartAgree').checked=false;$('restartConfirm').disabled=true;$('restartModal').classList.add('show');$('restartModal').setAttribute('aria-hidden','false');SkyAudio.ui()});
+$('restartAgree').addEventListener('change',()=>{$('restartConfirm').disabled=!$('restartAgree').checked});
+$('restartCancel').addEventListener('click',e=>{e.stopPropagation();$('restartModal').classList.remove('show');$('restartModal').setAttribute('aria-hidden','true');SkyAudio.ui()});
+$('restartModal').addEventListener('pointerdown',e=>e.stopPropagation());
+$('restartConfirm').addEventListener('click',e=>{e.stopPropagation();if(!$('restartAgree').checked)return;resetting=true;try{localStorage.removeItem(SAVE_KEY)}catch{}location.reload()});
+
+function pos(e){const r=c.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top}}
+function pan(dx,dy){cam.anim=false;cam.x-=dx/cam.z;cam.y-=dy/cam.z}
+c.addEventListener('pointerdown',e=>{e.preventDefault();$('tips').classList.remove('show');const s=pos(e);pointers.set(e.pointerId,s);const w=s2w(s.x,s.y);gesture={id:e.pointerId,start:s,last:s,a:w,b:w,moved:false,t:tool}});
+c.addEventListener('pointermove',e=>{e.preventDefault();if(!gesture||gesture.id!==e.pointerId)return;const s=pos(e);gesture.b=s2w(s.x,s.y);if(Math.hypot(s.x-gesture.start.x,s.y-gesture.start.y)>8)gesture.moved=true;if((gesture.t==='move'||gesture.t==='pick')&&gesture.moved)pan(s.x-gesture.last.x,s.y-gesture.last.y);gesture.last=s});
+function end(e){e.preventDefault();if(!gesture||gesture.id!==e.pointerId)return;const g=gesture;gesture=null;if(!g.moved){const worker=minerAt(g.b);if(worker){openMinerMenu(worker);return}}if(g.t==='move')return;if(g.t==='pick'){if(!g.moved)mine(g.b);return}if(g.t==='miner'){if(!g.moved)placeMiner(g.b);return}if(!g.moved)one(g.t,g.b);else if(shape)solid(g.t,g.a,g.b)}
+c.addEventListener('pointerup',end);c.addEventListener('pointercancel',end);
+
+function topInfo(){let bestBody=null,bestY=Infinity,bestX=0;for(const q of bs)if(q.game?.placed){const y=Math.min(...q.vertices.map(v=>v.y));if(y<bestY){bestY=y;bestBody=q;const near=q.vertices.filter(v=>v.y<=y+1.5);bestX=near.reduce((s,v)=>s+v.x,0)/near.length}}return bestBody?{body:bestBody,x:bestX,y:bestY,m:Math.max(0,Math.round(-Math.min(0,bestY)/B))}:null}
+function topPoint(){const p=topInfo();return p?{x:p.x,y:p.y}:null}
+function go(p){cam.tx=p.x;cam.ty=p.y;cam.anim=true}
+function frontier(){const cx=cell(cam.x);let dug=false;for(let cy=0;cy<DEPTH;cy++){if(!grid.has(key(cx,cy)))dug=true;else if(dug||cy===0)return{x:ctr(cx),y:ctr(cy)}}return{x:ctr(cx),y:ctr(DEPTH-1)}}
+$('top').onclick=()=>{const p=topPoint();go(p||{x:cam.x,y:-16});SkyAudio.ui()};$('down').onclick=()=>{go(frontier());SkyAudio.ui()};
+
+function nextMinerMilestone(){if(best<20)return 20;return 20+(Math.floor((best-20)/10)+1)*10}
+function quest(){
+  if(best<5){$('questTitle').textContent='Reach 5 m';$('questSub').textContent='Unlock 2×2 solid building';return}
+  if(best<10){$('questTitle').textContent='Reach 10 m';$('questSub').textContent='Unlock STONE mining';return}
+  const goals=[],lim=buildLimit();if(lim<10){const h=5+(lim-1)*10;goals.push({h,title:'Reach '+h+' m',sub:'Unlock '+(lim+1)+'×'+(lim+1)+' building'})}
+  const mh=nextMinerMilestone();goals.push({h:mh,title:'Reach '+mh+' m',sub:'Unlock +1 Level 1 miner'});goals.sort((a,b)=>a.h-b.h);$('questTitle').textContent=goals[0].title;$('questSub').textContent=goals[0].sub
+}
+function awardHigh(m){
+  if(m<=best)return;const old=best,oldLim=buildLimitAt(old),oldMinerCount=minerCountAt(old);best=m;
+  if(old<5&&best>=5){shape=true;toast('★ 5 m! SOLID BUILDING UNLOCKED! ★\nDrag up to 2×2.',true);SkyAudio.unlock()}
+  if(old<10&&best>=10){stone=true;toast('★ 10 m! STONE UNLOCKED! ★',true);SkyAudio.unlock()}
+  if(buildLimit()>oldLim&&old>=5){toast('★ BUILD SIZE UPGRADED! ★\nMAX '+buildLimit()+'×'+buildLimit(),true);SkyAudio.unlock()}
+  const gained=minerCountAt(best)-oldMinerCount;if(gained>0){for(let i=0;i<gained;i++)restingMiners.push({id:++minerId,level:1,gold:0});toast('★ MINER UNLOCKED! ★\n+'+gained+' LEVEL 1 MINER'+(gained>1?'S':'')+' ⛏',true);SkyAudio.unlock()}
+  ui();quest();saveSoon()
+}
+function progress(now){
+  const p=topInfo(),m=p?p.m:0;$('height').textContent=m+' m';
+  const el=$('stability');
+  if(!p||m<=best){highCandidate=null;el.classList.remove('show');return}
+  const speed=Math.hypot(p.body.velocity.x,p.body.velocity.y),spin=Math.abs(p.body.angularVelocity);
+  const stable=speed<.16&&spin<.025;
+  if(!stable){highCandidate=null;el.classList.add('show');$('stabilityText').textContent='STABILIZING…';$('stabilityFill').style.width='0%';return}
+  if(!highCandidate||highCandidate.bodyId!==p.body.id||Math.abs(highCandidate.m-m)>1){highCandidate={bodyId:p.body.id,m,start:now,x:p.body.position.x,y:p.body.position.y,angle:p.body.angle}}
+  const drift=Math.hypot(p.body.position.x-highCandidate.x,p.body.position.y-highCandidate.y),rot=Math.abs(normAngle(p.body.angle-highCandidate.angle));
+  if(drift>B*.18||rot>.045){highCandidate={bodyId:p.body.id,m,start:now,x:p.body.position.x,y:p.body.position.y,angle:p.body.angle}}
+  const elapsed=now-highCandidate.start,pct=clamp(elapsed/3000,0,1);el.classList.add('show');$('stabilityText').textContent='NEW HIGH · '+(3-elapsed/1000).toFixed(1)+'s';$('stabilityFill').style.width=(pct*100)+'%';
+  if(elapsed>=3000){el.classList.remove('show');awardHigh(m);highCandidate=null}
+}
+
+function bg(){
+  const alt=Math.max(0,-cam.y/(B*12)),t=clamp(alt/10,0,1),mix=(a,b)=>`rgb(${a.map((v,i)=>Math.round(v+(b[i]-v)*t)).join(',')})`;
+  const sky=ctx.createLinearGradient(0,0,0,HH);sky.addColorStop(0,mix([142,216,255],[17,26,55]));sky.addColorStop(1,mix([209,239,255],[55,74,108]));ctx.fillStyle=sky;ctx.fillRect(0,0,W,HH);
+  const groundY=w2s(0,0).y,deepY=w2s(0,DEPTH*B).y;if(groundY<HH){const earth=ctx.createLinearGradient(0,groundY,0,Math.max(groundY+1,deepY));earth.addColorStop(0,'#4c3020');earth.addColorStop(.12,'#422b1e');earth.addColorStop(.30,'#333036');earth.addColorStop(.58,'#222832');earth.addColorStop(.84,'#161a21');earth.addColorStop(1,'#090c10');ctx.fillStyle=earth;ctx.fillRect(0,Math.max(0,groundY),W,HH-Math.max(0,groundY))}ctx.fillStyle='#72b552';ctx.fillRect(0,groundY-5*cam.z,W,6*cam.z)
+}
+function cracks(z,sw,sh){if(!Number.isFinite(z.game.max)||z.game.max<=1||z.game.hits<=0)return;const n=Math.ceil(z.game.hits/z.game.max*4),paths=[[[-.1,-.5],[-.02,-.2],[-.18,0],[.03,.15]],[[-.5,.05],[-.25,0],[-.1,.2],[-.22,.42]],[[.5,-.2],[.25,-.1],[.1,.08],[.3,.25]],[[.1,.5],[.05,.25],[-.08,.1],[.08,-.05]]];ctx.strokeStyle='#222b35';ctx.lineWidth=Math.max(1,1.5*cam.z);for(let i=0;i<n;i++){ctx.beginPath();paths[i].forEach((p,j)=>j?ctx.lineTo(p[0]*sw,p[1]*sh):ctx.moveTo(p[0]*sw,p[1]*sh));ctx.stroke()}}
+function draw(z){const s=w2s(z.position.x,z.position.y),sw=z.game.w*cam.z,sh=z.game.h*cam.z;if(s.x+sw/2<0||s.x-sw/2>W||s.y+sh/2<0||s.y-sh/2>HH)return;ctx.save();ctx.translate(s.x,s.y);ctx.rotate(z.angle);ctx.fillStyle=M[z.game.material].col[0];ctx.fillRect(-sw/2,-sh/2,sw,sh);ctx.fillStyle=M[z.game.material].col[1];ctx.fillRect(-sw/2,sh/2-Math.max(2,3*cam.z),sw,Math.max(2,3*cam.z));if(z.game.material==='bedrock'){ctx.fillStyle='#303741';for(let x=-sw/2+5;x<sw/2;x+=12)for(let y=-sh/2+5;y<sh/2;y+=12)if(((x+y)|0)%3)ctx.fillRect(x,y,3,3)}cracks(z,sw,sh);if(z.game.flash>0){ctx.strokeStyle='#fff3a0';ctx.lineWidth=3;ctx.strokeRect(-sw/2+2,-sh/2+2,sw-4,sh-4);z.game.flash--}ctx.restore()}
+function drawMiner(q,now){
+  const s=w2s(q.position.x,q.position.y),w=B*.66*cam.z,h=B*.80*cam.z;if(s.x+w<0||s.x-w>W||s.y+h<0||s.y-h>HH)return;const flip=q.game.dir<0?-1:1;
+  ctx.save();ctx.translate(s.x,s.y);ctx.rotate(q.angle);ctx.scale(flip,1);ctx.lineWidth=Math.max(1,2*cam.z);ctx.strokeStyle='#243247';ctx.fillStyle='#26384b';ctx.fillRect(-w*.30,h*.27,w*.22,h*.18);ctx.fillRect(w*.08,h*.27,w*.22,h*.18);ctx.fillStyle=q.game.level===1?'#3c75a6':q.game.level===2?'#6956a8':'#39465f';ctx.fillRect(-w*.34,-h*.05,w*.68,h*.36);ctx.strokeRect(-w*.34,-h*.05,w*.68,h*.36);ctx.fillStyle='#f0b78d';ctx.fillRect(-w*.29,-h*.35,w*.58,h*.34);ctx.strokeRect(-w*.29,-h*.35,w*.58,h*.34);ctx.fillStyle=q.game.level===1?'#f0c84c':q.game.level===2?'#e9dd63':'#aab4c7';ctx.fillRect(-w*.36,-h*.46,w*.72,h*.14);ctx.fillRect(-w*.27,-h*.54,w*.54,h*.11);ctx.strokeRect(-w*.36,-h*.46,w*.72,h*.14);ctx.fillStyle='#243247';const eye=Math.max(1,2.1*cam.z);ctx.fillRect(w*.02,-h*.22,eye,eye);ctx.fillRect(w*.18,-h*.22,eye,eye);
+  if(q.game.gold>0){ctx.fillStyle='#ffd84f';ctx.beginPath();ctx.arc(-w*.35,h*.13,Math.max(2,w*.12),0,Math.PI*2);ctx.fill();ctx.stroke()}
+  if(now<q.game.pickUntil){ctx.strokeStyle='#5c3d2b';ctx.lineWidth=Math.max(2,2.2*cam.z);ctx.beginPath();ctx.moveTo(w*.25,-h*.03);ctx.lineTo(w*.62,-h*.42);ctx.stroke();ctx.strokeStyle='#9aa1aa';ctx.lineWidth=Math.max(2,2.5*cam.z);ctx.beginPath();ctx.moveTo(w*.43,-h*.46);ctx.lineTo(w*.73,-h*.33);ctx.stroke()}ctx.restore()
+}
+function drawGoldBursts(now){for(let i=goldBursts.length-1;i>=0;i--){const g=goldBursts[i],age=(now-g.born)/1000;if(age>1.25){goldBursts.splice(i,1);continue}const s=w2s(g.x,g.y),rise=age*28,alpha=1-age/1.25;ctx.save();ctx.globalAlpha=alpha;ctx.fillStyle='#ffd84f';ctx.strokeStyle='#7b5516';ctx.lineWidth=2;ctx.beginPath();ctx.arc(s.x,s.y-rise,Math.max(4,7*cam.z),0,Math.PI*2);ctx.fill();ctx.stroke();ctx.fillStyle='#fff7bd';ctx.font='900 10px ui-monospace';ctx.fillText((g.stolen?'POCKETED ':'+')+g.n,s.x+10,s.y-rise+3);ctx.restore()}}
+function preview(){if(!gesture||!M[gesture.t]||gesture.t==='bedrock'||!shape||!gesture.moved)return;const r=rect(gesture.a,gesture.b,buildLimit()),a=w2s(r.minx*B,r.miny*B),w=r.nx*B*cam.z,h=r.ny*B*cam.z;ctx.globalAlpha=.35;ctx.fillStyle=M[gesture.t].col[0];ctx.fillRect(a.x,a.y,w,h);ctx.globalAlpha=1;ctx.fillStyle='#fff';ctx.font='900 12px ui-monospace';ctx.fillText(r.nx+'×'+r.ny+' · '+r.cost,a.x+5,a.y+16)}
+function loop(now){const t=now||performance.now();Engine.update(eng,16.67);updateMiners(t);if(cam.anim){cam.x+=(cam.tx-cam.x)*.12;cam.y+=(cam.ty-cam.y)*.12;if(Math.abs(cam.tx-cam.x)<.3&&Math.abs(cam.ty-cam.y)<.3)cam.anim=false}ensureWorld();progress(t);ctx.setTransform(DPR,0,0,DPR,0,0);bg();for(const z of bs)draw(z);for(const q of miners)drawMiner(q,t);drawGoldBursts(t);preview();requestAnimationFrame(loop)}
+
+restoreDynamicState(initialSave);ui();quest();load.remove();toast(initialSave?'SAVE RESTORED 💾':'MINE DIRT. BUILD UP.');requestAnimationFrame(loop);
+})();
