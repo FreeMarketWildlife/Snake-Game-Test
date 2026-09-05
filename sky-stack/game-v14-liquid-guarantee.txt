@@ -1,0 +1,118 @@
+
+// --- v14 LIQUID GUARANTEE ----------------------------------------------------------
+// Pockets are rendered as full-cell liquid reservoirs until the player's mine reaches
+// them. Real fluid bodies still live inside the reservoir and take over once released.
+var liquidReservoirVisuals;
+function reservoirInit(){if(!liquidReservoirVisuals)liquidReservoirVisuals=new Map()}
+
+function pocketDefs(ch){
+  liquidInit();
+  if(pocketCache.has(ch))return pocketCache.get(ch);
+  const base=ch*24,defs=[];
+
+  // Two guaranteed starter halves meet around world x=0 so water is unmistakable.
+  if(ch===-1){
+    const cells=[];for(let x=base+20;x<base+24;x++){cells.push([x,0]);if(x>base+20)cells.push([x,1])}
+    defs.push({id:'water:surface:v14:-1',kind:'water',surface:true,cells})
+  }else if(ch===0){
+    const cells=[];for(let x=base;x<base+4;x++){cells.push([x,0]);if(x<base+3)cells.push([x,1])}
+    defs.push({id:'water:surface:v14:0',kind:'water',surface:true,cells})
+  }else if(hash01(ch,0,701)<.82){
+    const width=4+Math.floor(hash01(ch,0,702)*4),left=base+3+Math.floor(hash01(ch,0,703)*Math.max(1,18-width));
+    const cells=[];for(let x=left;x<left+width;x++){cells.push([x,0]);if(x>left&&x<left+width-1)cells.push([x,1])}
+    defs.push({id:'water:surface:v14:'+ch,kind:'water',surface:true,cells})
+  }
+
+  // Every chunk gets a stone-layer water pocket; many get a second one.
+  {
+    const cx=base+4+Math.floor(hash01(ch,1,711)*16),cy=10+Math.floor(hash01(ch,1,712)*12);
+    const rx=2+Math.floor(hash01(ch,1,713)*2),ry=1+Math.floor(hash01(ch,1,714)*2);
+    defs.push({id:'water:stoneA:v14:'+ch,kind:'water',surface:false,cells:ellipseCells(cx,cy,rx,ry)})
+  }
+  if(hash01(ch,3,715)<.58){
+    const cx=base+5+Math.floor(hash01(ch,3,716)*14),cy=12+Math.floor(hash01(ch,3,717)*10);
+    defs.push({id:'water:stoneB:v14:'+ch,kind:'water',surface:false,cells:ellipseCells(cx,cy,2,1)})
+  }
+
+  // Lava is extremely common in deepslate while we tune the mechanic.
+  if(hash01(ch,2,721)<.90){
+    const cx=base+4+Math.floor(hash01(ch,2,722)*16),cy=34+Math.floor(hash01(ch,2,723)*13);
+    const rx=2+Math.floor(hash01(ch,2,724)*2),ry=1+Math.floor(hash01(ch,2,725)*2);
+    defs.push({id:'lava:deepA:v14:'+ch,kind:'lava',surface:false,cells:ellipseCells(cx,cy,rx,ry)})
+  }
+  if(hash01(ch,4,726)<.45){
+    const cx=base+5+Math.floor(hash01(ch,4,727)*14),cy=38+Math.floor(hash01(ch,4,728)*10);
+    defs.push({id:'lava:deepB:v14:'+ch,kind:'lava',surface:false,cells:ellipseCells(cx,cy,2,1)})
+  }
+
+  pocketCache.set(ch,defs);return defs
+}
+
+function makeReservoirVisual(d){
+  reservoirInit();if(!d||revealedPockets.has(d.id)||liquidReservoirVisuals.has(d.id))return;
+  const set=new Set();
+  for(const [cx,cy] of d.cells){
+    const q=Bodies.rectangle(ctr(cx),ctr(cy),B-1,B-1,{isStatic:true,isSensor:true,collisionFilter:{mask:0}});
+    q.game={kind:'liquid-visual',liquid:d.kind,material:d.kind,reservoir:true,w:B-1,h:B-1,max:Infinity,hits:0,cost:0,terrain:false,placed:false,born:-1};
+    bs.add(q);set.add(q)
+  }
+  liquidReservoirVisuals.set(d.id,set)
+}
+function removeReservoirVisual(d){
+  reservoirInit();const set=liquidReservoirVisuals.get(d?.id);if(!set)return;
+  for(const q of set)bs.delete(q);liquidReservoirVisuals.delete(d.id)
+}
+
+function seedPocket(d){
+  liquidInit();if(!d||fluidSeeded.has(d.id))return;
+  fluidSeeded.add(d.id);
+  const offsets=d.kind==='lava'?[[-7,-5],[7,-5],[-7,7],[7,7]]:[[-7,-6],[7,-6],[-7,7],[7,7]];
+  for(const [cx,cy] of d.cells)for(const [ox,oy] of offsets){
+    const jitterX=(hash01(cx*7+ox,cy,741)-.5)*1.6,jitterY=(hash01(cx,cy*7+oy,742)-.5)*1.6;
+    createFluid(d.kind,ctr(cx)+ox+jitterX,ctr(cy)+oy+jitterY)
+  }
+}
+function seedVisiblePockets(ch){for(const d of pocketDefs(ch)){seedPocket(d);makeReservoirVisual(d)}}
+
+function gen(ch){
+  liquidInit();
+  if(generated.has(ch))return;generated.add(ch);
+  for(let cy=0;cy<DEPTH;cy++)for(let cx=ch*24;cx<ch*24+24;cx++){
+    const k=key(cx,cy),p=pocketForCell(cx,cy);
+    if(p){naturalOpen.add(k);continue}
+    if(removedTerrain.has(k))continue;
+    const m=terrainMaterial(cx,cy),hits=terrainDamage.get(k)||0;mk(ctr(cx),ctr(cy),m,{static:true,terrain:true,cx,cy,hits})
+  }
+  seedVisiblePockets(ch)
+}
+function ensureWorld(){liquidInit();const ch=Math.floor(cam.x/(24*B));for(let i=ch-2;i<=ch+2;i++)gen(i)}
+
+function revealPocket(d){
+  liquidInit();if(!d||revealedPockets.has(d.id))return;
+  revealedPockets.add(d.id);removeReservoirVisual(d);wakeFluids();
+  if(window.SkyAudio?.splash)SkyAudio.splash(d.kind);
+  if(!d.surface)toast(d.kind==='lava'?'🔥 LAVA POCKET!':'💧 WATER POCKET!',true);
+  saveSoon()
+}
+function revealPocketsAround(cx,cy){
+  liquidInit();const pts=[[cx,cy],[cx,cy-1],[cx+1,cy],[cx,cy+1],[cx-1,cy]],seen=new Set();
+  for(const [x,y] of pts){const d=pocketForCell(x,y);if(d&&!seen.has(d.id)){seen.add(d.id);revealPocket(d)}}
+}
+
+// Pocket cavities are visible from generation, but underground walls only become
+// mineable when the player's actual tunnel has reached that pocket.
+function terrainExposed(z){
+  liquidInit();if(!z?.game?.terrain)return true;
+  const cx=z.game.cx,cy=z.game.cy;if(cy===0)return true;
+  const accessibleOpen=(x,y)=>{
+    if(removedTerrain.has(key(x,y)))return true;
+    const p=pocketForCell(x,y);return !!p&&(p.surface||revealedPockets.has(p.id))
+  };
+  return accessibleOpen(cx,cy-1)||accessibleOpen(cx+1,cy)||(cy+1<DEPTH&&accessibleOpen(cx,cy+1))||accessibleOpen(cx-1,cy)
+}
+
+// Reservoir visuals are deliberately not pickaxe targets.
+function at(p){
+  const a=Query.point([...bs],p).filter(z=>!z.game?.liquid&&!z.game?.reservoir);
+  a.sort((a,b)=>(b.game?.born||0)-(a.game?.born||0));return a[0]
+}
