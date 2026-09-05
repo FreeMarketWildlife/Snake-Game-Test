@@ -1,0 +1,10 @@
+
+function createObsidian(x,y,o={}){
+  const r=B*.36;
+  const near=Query.region([...bs],{min:{x:x-r,y:y-r},max:{x:x+r,y:y+r}}).find(z=>z.game?.worldProduct&&z.game.material==='obsidian');
+  if(near)return near;
+  const z=mk(x,y,'obsidian',{w:B*.72,h:B*.72});
+  z.game.worldProduct=true;z.game.cost=0;
+  if(o.angle)Body.setAngle(z,o.angle);
+  return z
+}
