@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const parts=[0,1,2,3].map(i=>'game-v8-part'+i+'.txt?v=8');
+const parts=[0,1,2,3].map(i=>'game-v8-part'+i+'.txt?v=9');
 (async()=>{
   try{
     let src='';
