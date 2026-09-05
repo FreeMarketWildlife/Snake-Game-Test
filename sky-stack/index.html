@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
   <meta name="theme-color" content="#8ed8ff">
   <title>Sky Stack</title>
-  <link rel="stylesheet" href="style.css?v=3">
+  <link rel="stylesheet" href="style.css?v=4">
 </head>
 <body>
 <div id="app">
@@ -33,7 +33,7 @@
     <p>✋ MOVE lets you drag around safely.</p>
     <p>⛏ Tap blocks to mine. Tougher blocks crack as you hit them.</p>
     <p>▲ TOP follows your highest build. ▼ DOWN follows your mine.</p>
-    <p>Keep climbing to discover new building abilities and materials.</p>
+    <p>Keep climbing to discover new building abilities, helpers, and materials.</p>
     <small>No spoilers — experiment with weight and support.</small>
   </div>
 
@@ -42,7 +42,10 @@
     <button class="slot sel" data-tool="pick"><span class="icon">⛏</span><span>PICK</span></button>
     <button class="slot empty" data-tool="dirt"><span class="blk dirt"><b class="num" id="dc">0</b></span><span>DIRT</span></button>
     <button class="slot locked" data-tool="stone" id="stoneSlot"><span class="blk stone"><b class="num" id="sc">0</b><i class="lock">🔒</i></span><span>STONE</span></button>
-    <button class="slot locked" disabled><span class="blk" style="background:#77828e;display:grid;place-items:center;color:white;font-size:20px">?</span><span>???</span></button>
+    <button class="slot locked" data-tool="miner" id="minerSlot">
+      <span class="minerToolIcon">👷<b class="minerCount" id="mc">0</b><i class="lock">20m</i></span>
+      <span>MINER I</span>
+    </button>
   </div>
 
   <div id="overlapWarn" class="modal" aria-hidden="true">
@@ -59,12 +62,25 @@
     </div>
   </div>
 
+  <div id="minerMenu" class="modal" aria-hidden="true">
+    <div class="modalCard box">
+      <div class="minerPortrait">👷</div>
+      <b>LEVEL 1 MINER</b>
+      <p>He mines nearby dirt and sends it straight to your inventory.</p>
+      <p class="warningText">About 1 dirt block per second. He cannot mine stone.</p>
+      <div class="modalActions minerActions">
+        <button class="btn" id="minerKeep">KEEP MINING</button>
+        <button class="btn primary" id="minerBreak">GIVE HIM A BREAK</button>
+      </div>
+    </div>
+  </div>
+
   <div id="toast" class="hide"></div>
   <div id="load">Loading physics…</div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/matter-js@0.20.0/build/matter.min.js"></script>
 <script src="audio.js?v=2"></script>
-<script src="game.js?v=3"></script>
+<script src="game.js?v=4"></script>
 </body>
 </html>
