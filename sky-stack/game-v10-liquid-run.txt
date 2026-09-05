@@ -1,0 +1,14 @@
+
+var liquidVisualLoopStarted=false;
+function liquidVisualLoop(now){
+  const t=now||performance.now();
+  updateLiquids(t);
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  drawFluids(t);
+  requestAnimationFrame(liquidVisualLoop)
+}
+setTimeout(()=>{
+  if(liquidVisualLoopStarted)return;
+  liquidVisualLoopStarted=true;
+  requestAnimationFrame(liquidVisualLoop)
+},0);
