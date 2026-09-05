@@ -1,14 +1,15 @@
 (() => {
 'use strict';
 const parts=[
-  'game-v8-part0.txt?v=14',
-  'game-v8-part1.txt?v=14',
-  'game-v8-part2.txt?v=14',
-  'game-v10-liquid.txt?v=14',
-  'game-v10-liquid-fixes.txt?v=14',
-  'game-v13-liquid-visibility.txt?v=14',
-  'game-v14-liquid-guarantee.txt?v=14',
-  'game-v8-part3.txt?v=14'
+  'game-v8-part0.txt?v=15',
+  'game-v8-part1.txt?v=15',
+  'game-v8-part2.txt?v=15',
+  'game-v10-liquid.txt?v=15',
+  'game-v10-liquid-fixes.txt?v=15',
+  'game-v13-liquid-visibility.txt?v=15',
+  'game-v14-liquid-guarantee.txt?v=15',
+  'game-v15-liquid-diagnostic.txt?v=15',
+  'game-v8-part3.txt?v=15'
 ];
 (async()=>{
   try{
