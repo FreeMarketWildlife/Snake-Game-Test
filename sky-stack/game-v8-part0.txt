@@ -7,7 +7,7 @@ if(!window.Matter){load.textContent='Physics failed to load';return}
 const {Engine,World,Bodies,Body,Query,Sleeping}=Matter;
 const c=$('game'),ctx=c.getContext('2d');
 const B=32,H=16,DEPTH=64,TRANSITION=4;
-const DIRT_END=6,STONE_END=26,DEEPSLATE_END=54,BEDROCK_START=54;
+const DIRT_END=6,STONE_END=26,DEEPSLATE_END=52,BEDROCK_START=56;
 const SAVE_KEY='skyStack.save.v1';
 const LV2_COST=8,LV3_COST=20;
 const M={
@@ -48,12 +48,13 @@ function mixedMaterial(cx,cy,start,a,b){
   return hash01(cx,cy,11+start)<p?b:a
 }
 function terrainMaterial(cx,cy){
-  const ds=DIRT_END-Math.floor(TRANSITION/2),ss=STONE_END-Math.floor(TRANSITION/2),bs0=BEDROCK_START;
+  const ds=DIRT_END-Math.floor(TRANSITION/2),ss=STONE_END-Math.floor(TRANSITION/2),bs0=DEEPSLATE_END;
   if(cy<ds)return 'dirt';
   if(cy<ds+TRANSITION)return mixedMaterial(cx,cy,ds,'dirt','stone');
   if(cy<ss)return 'stone';
   if(cy<ss+TRANSITION)return mixedMaterial(cx,cy,ss,'stone','deepslate');
   if(cy<bs0)return 'deepslate';
+  if(cy<BEDROCK_START)return mixedMaterial(cx,cy,bs0,'deepslate','bedrock');
   return 'bedrock'
 }
 function goldAt(cx,cy){
