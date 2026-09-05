@@ -1,0 +1,125 @@
+
+// --- v13 LIQUID VISIBILITY / DENSITY PATCH ---------------------------------------
+// Underground liquid cavities now replace terrain immediately (Terraria-style),
+// while their walls only become mineable after the player's excavation reaches them.
+
+function pocketDefs(ch){
+  liquidInit();
+  if(pocketCache.has(ch))return pocketCache.get(ch);
+  const base=ch*24,defs=[];
+
+  // Guarantee a visible starter pond near the spawn chunk; ponds remain common elsewhere.
+  if(ch===0||hash01(ch,0,601)<.78){
+    const starter=ch===0;
+    const width=starter?5:4+Math.floor(hash01(ch,0,602)*4);
+    const left=starter?1:base+3+Math.floor(hash01(ch,0,603)*Math.max(1,18-width));
+    const cells=[];
+    for(let x=left;x<left+width;x++){
+      cells.push([x,0]);
+      if(x>left&&x<left+width-1)cells.push([x,1]);
+    }
+    defs.push({id:'water:surface:v13:'+ch,kind:'water',surface:true,cells})
+  }
+
+  // Stone layer: one very common pocket plus an occasional second pocket.
+  if(hash01(ch,1,611)<.90){
+    const cx=base+4+Math.floor(hash01(ch,1,612)*16),cy=10+Math.floor(hash01(ch,1,613)*12);
+    const rx=2+Math.floor(hash01(ch,1,614)*2),ry=1+Math.floor(hash01(ch,1,615)*2);
+    defs.push({id:'water:stoneA:v13:'+ch,kind:'water',surface:false,cells:ellipseCells(cx,cy,rx,ry)})
+  }
+  if(hash01(ch,3,616)<.45){
+    const cx=base+5+Math.floor(hash01(ch,3,617)*14),cy=12+Math.floor(hash01(ch,3,618)*10);
+    defs.push({id:'water:stoneB:v13:'+ch,kind:'water',surface:false,cells:ellipseCells(cx,cy,2,1)})
+  }
+
+  // Deepslate layer: lava is now common enough that players should actually encounter it.
+  if(hash01(ch,2,621)<.78){
+    const cx=base+4+Math.floor(hash01(ch,2,622)*16),cy=34+Math.floor(hash01(ch,2,623)*13);
+    const rx=2+Math.floor(hash01(ch,2,624)*2),ry=1+Math.floor(hash01(ch,2,625)*2);
+    defs.push({id:'lava:deepA:v13:'+ch,kind:'lava',surface:false,cells:ellipseCells(cx,cy,rx,ry)})
+  }
+  if(hash01(ch,4,626)<.30){
+    const cx=base+5+Math.floor(hash01(ch,4,627)*14),cy=38+Math.floor(hash01(ch,4,628)*10);
+    defs.push({id:'lava:deepB:v13:'+ch,kind:'lava',surface:false,cells:ellipseCells(cx,cy,2,1)})
+  }
+
+  pocketCache.set(ch,defs);return defs
+}
+
+// Every generated pocket is a real cavity immediately, not stone hiding a future liquid.
+function pocketVisible(d){return !!d}
+
+function seedPocket(d){
+  liquidInit();if(!d||fluidSeeded.has(d.id))return;
+  fluidSeeded.add(d.id);
+  const offsets=d.kind==='lava'?[[-5,0],[5,0]]:[[-6,-2],[6,2]];
+  for(const [cx,cy] of d.cells)for(const [ox,oy] of offsets){
+    const jitterX=(hash01(cx*7+ox,cy,641)-.5)*1.8,jitterY=(hash01(cx,cy*7+oy,642)-.5)*1.8;
+    createFluid(d.kind,ctr(cx)+ox+jitterX,ctr(cy)+oy+jitterY)
+  }
+}
+function seedVisiblePockets(ch){for(const d of pocketDefs(ch))seedPocket(d)}
+
+function gen(ch){
+  liquidInit();
+  if(generated.has(ch))return;generated.add(ch);
+  for(let cy=0;cy<DEPTH;cy++)for(let cx=ch*24;cx<ch*24+24;cx++){
+    const k=key(cx,cy),p=pocketForCell(cx,cy);
+    if(p){naturalOpen.add(k);continue}
+    if(removedTerrain.has(k))continue;
+    const m=terrainMaterial(cx,cy),hits=terrainDamage.get(k)||0;mk(ctr(cx),ctr(cy),m,{static:true,terrain:true,cx,cy,hits})
+  }
+  seedVisiblePockets(ch)
+}
+function ensureWorld(){liquidInit();const ch=Math.floor(cam.x/(24*B));for(let i=ch-2;i<=ch+2;i++)gen(i)}
+
+// The cavity can be visible before it is connected to the player's mine.
+function revealPocket(d){
+  liquidInit();if(!d||d.surface||revealedPockets.has(d.id))return;
+  revealedPockets.add(d.id);wakeFluids();
+  if(window.SkyAudio?.splash)SkyAudio.splash(d.kind);
+  toast(d.kind==='lava'?'🔥 LAVA POCKET!':'💧 WATER POCKET!',true);saveSoon()
+}
+
+function terrainExposed(z){
+  liquidInit();
+  if(!z?.game?.terrain)return true;
+  const cx=z.game.cx,cy=z.game.cy;
+  if(cy===0)return true;
+  const accessibleOpen=(x,y)=>{
+    if(removedTerrain.has(key(x,y)))return true;
+    const p=pocketForCell(x,y);
+    return !!p&&(p.surface||revealedPockets.has(p.id))
+  };
+  return accessibleOpen(cx,cy-1)||accessibleOpen(cx+1,cy)||(cy+1<DEPTH&&accessibleOpen(cx,cy+1))||accessibleOpen(cx-1,cy)
+}
+
+// Put liquid bodies into the normal render set so the main canvas loop always draws them.
+M.water={taps:Infinity,d:.00016,f:.008,r:.035,a:.022,col:['#2d8fdd','#176fb2']};
+M.lava={taps:Infinity,d:.00042,f:.045,r:.01,a:.075,col:['#f05a28','#b9311d']};
+
+function createFluid(kind,x,y,o={}){
+  liquidInit();if(!Number.isFinite(fluidId))fluidId=0;
+  const lava=kind==='lava',radius=lava?7.1:7.4;
+  const q=Bodies.circle(x,y,radius,{
+    density:lava?.00042:.00016,friction:lava?.045:.008,frictionStatic:0,
+    restitution:lava?.01:.035,frictionAir:lava?.075:.022,slop:.02,sleepThreshold:lava?90:65
+  });
+  q.game={kind:'liquid',liquid:kind,material:kind,id:++fluidId,born:performance.now(),w:radius*2,h:radius*2,max:Infinity,hits:0,cost:0,terrain:false,placed:false};
+  if(o.velocity)Body.setVelocity(q,{x:finite(o.velocity.x),y:finite(o.velocity.y)});
+  fluids.add(q);bs.add(q);World.add(eng.world,q);return q
+}
+function removeFluid(q){if(!q||!fluids.has(q))return;fluids.delete(q);bs.delete(q);World.remove(eng.world,q)}
+
+// Liquids are scenery/physics, not pickaxe targets.
+function at(p){
+  const a=Query.point([...bs],p).filter(z=>!z.game?.liquid);
+  a.sort((a,b)=>(b.game?.born||0)-(a.game?.born||0));return a[0]
+}
+
+// Run liquid reactions/buoyancy directly after the same physics tick as the game.
+var liquidMainHookInstalled=false;
+if(!liquidMainHookInstalled){
+  liquidMainHookInstalled=true;
+  Matter.Events.on(eng,'afterUpdate',()=>updateLiquids(performance.now()))
+}
