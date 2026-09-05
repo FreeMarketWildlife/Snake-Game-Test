@@ -72,4 +72,15 @@ function at(p){const a=Query.point([...bs],p);a.sort((a,b)=>(b.game?.born||0)-(a
 function minerAt(p){return Query.point([...miners],p)[0]||null}
 function wake(){for(const q of bs)if(q.game?.placed&&!q.isStatic){Sleeping.set(q,false);Body.setVelocity(q,{x:q.velocity.x,y:q.velocity.y+.001})}}
 function goldBurst(x,y,n,stolen=false){goldBursts.push({x,y,n,stolen,born:performance.now()})}
+function terrainExposed(z){
+  if(!z?.game?.terrain)return true;
+  const cx=z.game.cx,cy=z.game.cy;
+  if(cy===0)return true;
+  return [[0,-1],[1,0],[0,1],[-1,0]].some(([dx,dy])=>{
+    const nx=cx+dx,ny=cy+dy;
+    if(ny<0)return true;
+    if(ny>=DEPTH)return false;
+    return removedTerrain.has(key(nx,ny))
+  })
+}
 function harvest(z,collector='player',miner=null){
