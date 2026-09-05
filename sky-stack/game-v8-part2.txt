@@ -35,8 +35,8 @@ function minerMaterial(q){return q.game.level===1?'dirt':q.game.level===2?'stone
 function mineableNear(q){const r=B*1.18,m=minerMaterial(q);return Query.region([...bs],{min:{x:q.position.x-r,y:q.position.y-r},max:{x:q.position.x+r,y:q.position.y+r}}).filter(z=>z.game?.terrain&&z.game.material===m)}
 function minerHit(q,target){if(target.game.material==='bedrock')return;target.game.hits++;target.game.flash=5;terrainDamage.set(key(target.game.cx,target.game.cy),target.game.hits);SkyAudio.hit(target.game.material,target.game.hits>=target.game.max,target.game.hits);if(target.game.hits>=target.game.max)harvest(target,'miner',q);else saveSoon()}
 function selfRightMiner(q,now){
-  const g=q.game,speed=Math.hypot(q.velocity.x,q.velocity.y),ang=Math.abs(normAngle(q.angle));
-  if(speed<.35&&Math.abs(q.angularVelocity)<.12){if(!g.uprightSince)g.uprightSince=now;if(now-g.uprightSince>260&&ang>.035){const err=-normAngle(q.angle);Body.setAngularVelocity(q,clamp(q.angularVelocity*.45+err*.09,-.18,.18));if(ang<.09)Body.setAngle(q,q.angle*.78)}}else g.uprightSince=0
+  const g=q.game,ang=Math.abs(normAngle(q.angle));
+  if(Math.abs(q.velocity.y)<.32&&Math.abs(q.angularVelocity)<.12){if(!g.uprightSince)g.uprightSince=now;if(now-g.uprightSince>260&&ang>.035){const err=-normAngle(q.angle);Body.setAngularVelocity(q,clamp(q.angularVelocity*.45+err*.09,-.18,.18));if(ang<.09)Body.setAngle(q,q.angle*.78)}}else g.uprightSince=0
 }
 function updateMiners(now){
   for(const q of miners){
