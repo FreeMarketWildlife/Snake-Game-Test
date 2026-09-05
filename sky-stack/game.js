@@ -15,7 +15,7 @@ const inv={dirt:0,stone:0},bs=new Set(),grid=new Map(),generated=new Set(),point
 const cam={x:0,y:-180,z:1,tx:0,ty:-180,anim:false};
 
 let tool='pick',gesture=null,best=0,shape=false,stone=false,toastTimer,minerId=0,selectedMiner=null;
-let pendingPlacement=null,overlapWarnedThisSession=false;
+let pendingPlacement=null;
 let overlapSuppressed=false;
 try{overlapSuppressed=localStorage.getItem('skyStack.hideOverlapWarning')==='1'}catch{}
 
@@ -183,8 +183,7 @@ function hideOverlapWarning(){
 }
 
 function warnOverlap(commit){
-  if(overlapSuppressed||overlapWarnedThisSession){commit();return}
-  overlapWarnedThisSession=true;
+  if(overlapSuppressed){commit();return}
   pendingPlacement=commit;
   $('overlapDont').checked=false;
   $('overlapWarn').classList.add('show');
