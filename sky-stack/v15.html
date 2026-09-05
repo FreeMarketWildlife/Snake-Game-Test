@@ -1,0 +1,32 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+  <meta name="theme-color" content="#8ed8ff">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>Sky Stack v15</title>
+  <link rel="stylesheet" href="style.css?v=7">
+</head>
+<body>
+<div id="app">
+  <canvas id="game"></canvas>
+  <div id="hud"><div class="hudLeft"><div class="height box"><small>HEIGHT</small><b id="height">0 m</b></div><div id="goldHud" class="box"><small>GOLD</small><b>● <span id="gc">0</span></b></div></div><div class="cams"><button class="btn" id="top">▲ TOP</button><button class="btn" id="down">▼ DOWN</button></div></div>
+  <div id="stability" class="box stability" aria-live="polite"><div id="stabilityText">STABILIZING…</div><div class="stabilityTrack"><i id="stabilityFill"></i></div></div>
+  <div id="quest" class="box"><small>NEXT GOAL</small><div id="questTitle">Reach 5 m</div><div id="questSub">Unlock 2×2 solid building</div></div>
+  <div id="mode" class="box">MAX 1×1</div><button class="btn" id="tipBtn">💡</button>
+  <div id="tips" class="box"><b>💡 QUICK TIPS</b><p>✋ MOVE lets you drag around safely.</p><p>⛏ Tap exposed blocks to mine. Dark buried blocks must touch open space first.</p><p>💧 Dirt floats in water. Stone and deepslate sink.</p><p>🔥 Water touching lava cools into solid obsidian.</p><p>▲ TOP follows your highest build. ▼ DOWN follows your mine.</p><p>New height records must stay stable for 3 seconds before they count.</p><small>No spoilers — valuable things can be hidden where you least expect them.</small><div class="saveNote">💾 Your world saves automatically on this device.</div><div class="resetSection"><button class="resetLink" id="restartWorld">↻ RESTART WORLD</button></div></div>
+  <div id="bar"><button class="slot" data-tool="move"><span class="icon">✋</span><span>MOVE</span></button><button class="slot sel" data-tool="pick"><span class="icon">⛏</span><span>PICK</span></button><button class="slot empty" data-tool="dirt"><span class="blk dirt"><b class="num" id="dc">0</b></span><span>DIRT</span></button><button class="slot locked" data-tool="stone" id="stoneSlot"><span class="blk stone"><b class="num" id="sc">0</b><i class="lock">🔒</i></span><span>STONE</span></button><button class="slot locked" data-tool="deepslate" id="deepSlot"><span class="blk deepslate"><b class="num" id="dsc">0</b><i class="lock">?</i></span><span>DEEP</span></button><button class="slot locked" data-tool="miner" id="minerSlot"><span class="minerToolIcon">👷<b class="minerCount" id="mc">0</b><i class="lock">20m</i></span><span>MINER</span></button></div>
+  <div id="overlapWarn" class="modal" aria-hidden="true"><div class="modalCard box"><div class="warningIcon">⚠</div><b>BLOCK COLLISION</b><p>This block overlaps one of your placed blocks.</p><p class="warningText">Placing it anyway may push, tilt, or launch your other blocks because the physics will force them apart.</p><label class="dontShow"><input type="checkbox" id="overlapDont"> <span>Don't show this again</span></label><div class="modalActions"><button class="btn" id="overlapCancel">CANCEL</button><button class="btn primary" id="overlapPlace">PLACE ANYWAY</button></div></div></div>
+  <div id="minerMenu" class="modal" aria-hidden="true"><div class="modalCard box minerCard"><div class="minerPortrait">👷</div><b id="minerTitle">LEVEL 1 MINER</b><div class="minerGold" id="minerGold">POCKETED GOLD: 0</div><p id="minerDesc">He mines dirt and sends the dirt to you. Hidden gold goes in his pocket.</p><p class="warningText" id="minerUpgradeHint">Upgrade him with gold to mine tougher material.</p><button class="btn upgradeBtn" id="minerUpgrade">UPGRADE TO LEVEL 2 · 8 GOLD</button><div class="minerActions3"><button class="btn" id="minerKeep">KEEP MINING</button><button class="btn primary" id="minerBreak">RETURN</button><button class="btn danger" id="minerKill">KILL MINER</button></div></div></div>
+  <div id="killModal" class="modal" aria-hidden="true"><div class="modalCard box restartCard"><div class="warningIcon dangerIcon">!</div><b>KILL THIS MINER?</b><p>You will permanently lose this miner.</p><p class="warningText">You will recover the <b id="killGold">0</b> gold he is carrying. A killed miner does not return to your toolbar.</p><div class="modalActions"><button class="btn" id="killCancel">NEVER MIND</button><button class="btn danger" id="killConfirm">YES, KILL MINER</button></div></div></div>
+  <div id="restartModal" class="modal" aria-hidden="true"><div class="modalCard box restartCard"><div class="warningIcon">↻</div><b>RESTART SKY STACK?</b><p>This permanently deletes this world's locally saved progress in this browser.</p><p class="warningText">Your mined terrain, inventory, gold, placed blocks, height progress, and miners will all reset to the beginning.</p><label class="dontShow restartAgree"><input type="checkbox" id="restartAgree"> <span>I understand my saved world will be deleted.</span></label><div class="modalActions"><button class="btn" id="restartCancel">KEEP MY WORLD</button><button class="btn danger" id="restartConfirm" disabled>YES, START OVER</button></div></div></div>
+  <div id="toast" class="hide"></div><div id="load">Loading physics…</div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/matter-js@0.20.0/build/matter.min.js"></script>
+<script src="audio.js?v=4"></script>
+<script src="game-v15.js"></script>
+</body>
+</html>
