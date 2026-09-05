@@ -1,0 +1,75 @@
+const initialSave=readSave();
+if(initialSave){
+  best=Math.max(0,finite(initialSave.best));shape=best>=5;stone=best>=10;deepslate=!!initialSave.deepslateUnlocked;
+  inv.dirt=Math.max(0,Math.floor(finite(initialSave.inv?.dirt)));inv.stone=Math.max(0,Math.floor(finite(initialSave.inv?.stone)));inv.deepslate=Math.max(0,Math.floor(finite(initialSave.inv?.deepslate)));inv.gold=Math.max(0,Math.floor(finite(initialSave.inv?.gold)));
+  deadMiners=Math.max(0,Math.floor(finite(initialSave.deadMiners)));
+  if(Array.isArray(initialSave.restingMiners))for(const r of initialSave.restingMiners)restingMiners.push({id:Math.max(1,Math.floor(finite(r.id))),level:clamp(Math.floor(finite(r.level)||1),1,3),gold:Math.max(0,Math.floor(finite(r.gold)))});
+  if(Array.isArray(initialSave.removed))for(const k of initialSave.removed)if(typeof k==='string')removedTerrain.add(k);
+  if(Array.isArray(initialSave.damage))for(const d of initialSave.damage)if(Array.isArray(d)&&typeof d[0]==='string'&&finite(d[1])>0)terrainDamage.set(d[0],Math.floor(d[1]));
+  if(initialSave.cam){cam.x=finite(initialSave.cam.x);cam.y=finite(initialSave.cam.y);cam.tx=cam.x;cam.ty=cam.y}
+}
+
+function mk(px,py,m,o={}){
+  const q=M[m],w=o.w||B-1,h=o.h||B-1;
+  const z=Bodies.rectangle(px,py,w,h,{isStatic:!!o.static,density:q.d,friction:q.f,frictionStatic:Math.min(1,q.f+.1),restitution:q.r,frictionAir:q.a,chamfer:{radius:1.2},sleepThreshold:70});
+  z.game={material:m,terrain:!!o.terrain,placed:!!o.placed,hits:o.hits||0,max:q.taps,cx:o.cx??null,cy:o.cy??null,w,h,cost:o.cost||1,born:performance.now()};
+  if(o.angle)Body.setAngle(z,o.angle);if(o.velocity)Body.setVelocity(z,{x:finite(o.velocity.x),y:finite(o.velocity.y)});if(o.angularVelocity)Body.setAngularVelocity(z,finite(o.angularVelocity));
+  bs.add(z);if(o.terrain)grid.set(key(o.cx,o.cy),z);World.add(eng.world,z);return z
+}
+function gen(ch){
+  if(generated.has(ch))return;generated.add(ch);
+  for(let cy=0;cy<DEPTH;cy++)for(let cx=ch*24;cx<ch*24+24;cx++){
+    const k=key(cx,cy);if(removedTerrain.has(k))continue;const m=terrainMaterial(cx,cy),hits=terrainDamage.get(k)||0;mk(ctr(cx),ctr(cy),m,{static:true,terrain:true,cx,cy,hits})
+  }
+}
+function ensureWorld(){const ch=Math.floor(cam.x/(24*B));for(let i=ch-2;i<=ch+2;i++)gen(i)}
+ensureWorld();
+World.add(eng.world,Bodies.rectangle(0,(DEPTH+2)*B,1000000,B*2,{isStatic:true,label:'deep-floor'}));
+
+function createMinerAt(x,y,o={}){
+  const q=Bodies.rectangle(x,y,B*.66,B*.80,{density:.00125,friction:.88,frictionStatic:.95,restitution:.02,frictionAir:.025,chamfer:{radius:2},sleepThreshold:100});
+  const id=Math.max(1,Math.floor(o.id||++minerId));minerId=Math.max(minerId,id);
+  q.game={kind:'miner',level:clamp(Math.floor(o.level||1),1,3),gold:Math.max(0,Math.floor(o.gold||0)),id,dir:o.dir===-1?-1:1,nextMine:performance.now()+700+Math.random()*300,nextTurn:performance.now()+800+Math.random()*1200,pickUntil:0,uprightSince:0};
+  if(o.angle)Body.setAngle(q,o.angle);if(o.velocity)Body.setVelocity(q,{x:finite(o.velocity.x),y:finite(o.velocity.y)});if(o.angularVelocity)Body.setAngularVelocity(q,finite(o.angularVelocity));
+  miners.add(q);World.add(eng.world,q);return q
+}
+function ensureChunkAtX(x){const ch=Math.floor(x/(24*B));for(let i=ch-1;i<=ch+1;i++)gen(i)}
+function restoreDynamicState(s){
+  if(!s)return;restoring=true;
+  if(Array.isArray(s.placed))for(const p of s.placed){if(!M[p.material]||p.material==='bedrock')continue;ensureChunkAtX(finite(p.x));mk(finite(p.x),finite(p.y),p.material,{placed:true,w:Math.max(4,finite(p.w)||B-1),h:Math.max(4,finite(p.h)||B-1),cost:Math.max(1,Math.floor(finite(p.cost)||1)),hits:Math.max(0,Math.floor(finite(p.hits))),angle:finite(p.angle),velocity:{x:finite(p.vx),y:finite(p.vy)},angularVelocity:finite(p.av)})}
+  if(Array.isArray(s.miners))for(const m of s.miners){ensureChunkAtX(finite(m.x));createMinerAt(finite(m.x),finite(m.y),{id:m.id,level:m.level,gold:m.gold,dir:m.dir,angle:finite(m.angle),velocity:{x:finite(m.vx),y:finite(m.vy)},angularVelocity:finite(m.av)})}
+  const earned=minerCountAt(best),accounted=miners.size+restingMiners.length+deadMiners;for(let i=accounted;i<earned;i++)restingMiners.push({id:++minerId,level:1,gold:0});
+  restingMiners.forEach(r=>minerId=Math.max(minerId,r.id||0));restoring=false
+}
+function saveGame(){
+  if(resetting)return;
+  try{
+    const placed=[];for(const z of bs)if(z.game?.placed)placed.push({material:z.game.material,x:z.position.x,y:z.position.y,w:z.game.w,h:z.game.h,cost:z.game.cost,hits:z.game.hits||0,angle:z.angle,vx:z.velocity.x,vy:z.velocity.y,av:z.angularVelocity});
+    const workerData=[];for(const q of miners)workerData.push({id:q.game.id,level:q.game.level,gold:q.game.gold,dir:q.game.dir,x:q.position.x,y:q.position.y,angle:q.angle,vx:q.velocity.x,vy:q.velocity.y,av:q.angularVelocity});
+    const s={v:1,savedAt:Date.now(),best,deepslateUnlocked:deepslate,inv:{...inv},deadMiners,restingMiners,removed:[...removedTerrain],damage:[...terrainDamage.entries()],placed,miners:workerData,cam:{x:cam.x,y:cam.y}};
+    localStorage.setItem(SAVE_KEY,JSON.stringify(s));lastSavedAt=performance.now()
+  }catch(e){console.warn('Save failed',e)}
+}
+function saveSoon(){if(restoring)return;if(performance.now()-lastSavedAt>350)saveGame()}
+setInterval(saveGame,2500);addEventListener('pagehide',saveGame);document.addEventListener('visibilitychange',()=>{if(document.hidden)saveGame()});
+
+function toast(t,long=false){clearTimeout(toastTimer);$('toast').textContent=t;$('toast').classList.remove('hide');toastTimer=setTimeout(()=>$('toast').classList.add('hide'),long?3000:1300)}
+function buildLimitAt(h){return h<5?1:Math.min(10,2+Math.floor(Math.max(0,h-5)/10))}
+function buildLimit(){return buildLimitAt(best)}
+function minerCountAt(h){return h<20?0:1+Math.floor((h-20)/10)}
+function unlockedMiners(){return minerCountAt(best)}
+function availableMiners(){return restingMiners.length}
+function ui(){
+  $('dc').textContent=inv.dirt;$('sc').textContent=inv.stone;$('dsc').textContent=inv.deepslate;$('gc').textContent=inv.gold;
+  document.querySelector('[data-tool=dirt]').classList.toggle('empty',!inv.dirt);
+  $('stoneSlot').classList.toggle('unlocked',stone);$('stoneSlot').classList.toggle('locked',!stone);
+  $('deepSlot').classList.toggle('unlocked',deepslate);$('deepSlot').classList.toggle('locked',!deepslate);$('deepSlot').classList.toggle('empty',deepslate&&!inv.deepslate);
+  const total=unlockedMiners(),available=availableMiners();$('mc').textContent=available;$('minerSlot').classList.toggle('unlocked',total>0);$('minerSlot').classList.toggle('locked',total===0);$('minerSlot').classList.toggle('empty',total>0&&available===0);
+  $('mode').textContent='MAX '+buildLimit()+'×'+buildLimit()
+}
+
+function at(p){const a=Query.point([...bs],p);a.sort((a,b)=>(b.game?.born||0)-(a.game?.born||0));return a[0]}
+function minerAt(p){return Query.point([...miners],p)[0]||null}
+function wake(){for(const q of bs)if(q.game?.placed&&!q.isStatic){Sleeping.set(q,false);Body.setVelocity(q,{x:q.velocity.x,y:q.velocity.y+.001})}}
+function goldBurst(x,y,n,stolen=false){goldBursts.push({x,y,n,stolen,born:performance.now()})}
+function harvest(z,collector='player',miner=null){
