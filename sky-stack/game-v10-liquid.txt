@@ -1,0 +1,245 @@
+
+// --- LIQUIDS / POCKETS / OBSIDIAN -------------------------------------------------
+// This file is concatenated inside the main Sky Stack IIFE before part 3.
+// `var` state is intentional: the replacement function declarations are hoisted and
+// can be called by the earlier boot code before this file's top-level statements run.
+var liquidStateReady=false,fluids,fluidSeeded,revealedPockets,naturalOpen,pocketCache,fluidId=0;
+var lastLiquidReaction=0,liquidFrame=0,wetBodies;
+
+function liquidInit(){
+  if(liquidStateReady)return;
+  fluids=new Set();fluidSeeded=new Set();revealedPockets=new Set();naturalOpen=new Set();pocketCache=new Map();wetBodies=new WeakSet();
+  const s=typeof initialSave!=='undefined'?initialSave:null;
+  if(s){
+    if(Array.isArray(s.fluidSeeded))for(const id of s.fluidSeeded)if(typeof id==='string')fluidSeeded.add(id);
+    if(Array.isArray(s.revealedPockets))for(const id of s.revealedPockets)if(typeof id==='string')revealedPockets.add(id);
+  }
+  liquidStateReady=true
+}
+
+function ellipseCells(cx,cy,rx,ry){
+  const out=[];
+  for(let y=cy-ry;y<=cy+ry;y++)for(let x=cx-rx;x<=cx+rx;x++){
+    const dx=(x-cx)/(rx+.15),dy=(y-cy)/(ry+.15);
+    if(dx*dx+dy*dy<=1)out.push([x,y])
+  }
+  return out
+}
+
+function pocketDefs(ch){
+  liquidInit();
+  if(pocketCache.has(ch))return pocketCache.get(ch);
+  const base=ch*24,defs=[];
+  if(hash01(ch,0,301)<.56){
+    const width=3+Math.floor(hash01(ch,0,302)*3);
+    const left=base+4+Math.floor(hash01(ch,0,303)*(16-width));
+    const cells=[];for(let x=left;x<left+width;x++)cells.push([x,0]);
+    defs.push({id:'water:surface:'+ch,kind:'water',surface:true,cells})
+  }
+  if(hash01(ch,1,311)<.48){
+    const cx=base+5+Math.floor(hash01(ch,1,312)*14),cy=11+Math.floor(hash01(ch,1,313)*11);
+    const rx=2+Math.floor(hash01(ch,1,314)*2),ry=1+Math.floor(hash01(ch,1,315)*2);
+    defs.push({id:'water:stone:'+ch,kind:'water',surface:false,cells:ellipseCells(cx,cy,rx,ry)})
+  }
+  if(hash01(ch,2,321)<.38){
+    const cx=base+5+Math.floor(hash01(ch,2,322)*14),cy=35+Math.floor(hash01(ch,2,323)*12);
+    const rx=2+Math.floor(hash01(ch,2,324)*2),ry=1+Math.floor(hash01(ch,2,325)*2);
+    defs.push({id:'lava:deep:'+ch,kind:'lava',surface:false,cells:ellipseCells(cx,cy,rx,ry)})
+  }
+  pocketCache.set(ch,defs);return defs
+}
+
+function pocketForCell(cx,cy){
+  const ch=Math.floor(cx/24);
+  for(const d of pocketDefs(ch))for(const p of d.cells)if(p[0]===cx&&p[1]===cy)return d;
+  return null
+}
+function pocketVisible(d){return !!d&&(d.surface||revealedPockets.has(d.id))}
+
+function createFluid(kind,x,y,o={}){
+  liquidInit();
+  const lava=kind==='lava';
+  const q=Bodies.circle(x,y,5.7,{
+    density:lava?.00042:.00016,friction:lava?.045:.008,frictionStatic:0,
+    restitution:lava?.01:.035,frictionAir:lava?.075:.022,slop:.02,sleepThreshold:lava?90:65
+  });
+  q.game={kind:'liquid',liquid:kind,id:++fluidId,born:performance.now()};
+  if(o.velocity)Body.setVelocity(q,{x:finite(o.velocity.x),y:finite(o.velocity.y)});
+  fluids.add(q);World.add(eng.world,q);return q
+}
+function removeFluid(q){if(!q||!fluids.has(q))return;fluids.delete(q);World.remove(eng.world,q)}
+function wakeFluids(){liquidInit();for(const q of fluids)Sleeping.set(q,false)}
+
+function seedPocket(d){
+  liquidInit();if(!d||fluidSeeded.has(d.id))return;
+  fluidSeeded.add(d.id);
+  const offsets=[[-7,-6],[7,-6],[-7,7],[7,7]];
+  for(const [cx,cy] of d.cells)for(const [ox,oy] of offsets){
+    const jitterX=(hash01(cx*7+ox,cy,401)-.5)*2,jitterY=(hash01(cx,cy*7+oy,402)-.5)*2;
+    createFluid(d.kind,ctr(cx)+ox+jitterX,ctr(cy)+oy+jitterY)
+  }
+}
+function seedVisiblePockets(ch){
+  for(const d of pocketDefs(ch))if(pocketVisible(d))seedPocket(d)
+}
+
+// Replace terrain generation so visible ponds/caves are true empty space.
+function gen(ch){
+  liquidInit();
+  if(generated.has(ch))return;generated.add(ch);
+  for(let cy=0;cy<DEPTH;cy++)for(let cx=ch*24;cx<ch*24+24;cx++){
+    const k=key(cx,cy),p=pocketForCell(cx,cy);
+    if(pocketVisible(p)){naturalOpen.add(k);continue}
+    if(removedTerrain.has(k))continue;
+    const m=terrainMaterial(cx,cy),hits=terrainDamage.get(k)||0;mk(ctr(cx),ctr(cy),m,{static:true,terrain:true,cx,cy,hits})
+  }
+  seedVisiblePockets(ch)
+}
+function ensureWorld(){liquidInit();const ch=Math.floor(cam.x/(24*B));for(let i=ch-2;i<=ch+2;i++)gen(i)}
+
+function revealPocket(d){
+  liquidInit();if(!d||d.surface||revealedPockets.has(d.id))return;
+  revealedPockets.add(d.id);
+  for(const [cx,cy] of d.cells){
+    const k=key(cx,cy);naturalOpen.add(k);
+    const z=grid.get(k);
+    if(z){grid.delete(k);bs.delete(z);World.remove(eng.world,z)}
+  }
+  seedPocket(d);wakeFluids();
+  if(window.SkyAudio?.splash)SkyAudio.splash(d.kind);
+  toast(d.kind==='lava'?'🔥 LAVA POCKET!':'💧 WATER POCKET!',true);saveSoon()
+}
+function revealPocketsAround(cx,cy){
+  liquidInit();
+  const pts=[[cx,cy],[cx,cy-1],[cx+1,cy],[cx,cy+1],[cx-1,cy]],seen=new Set();
+  for(const [x,y] of pts){const d=pocketForCell(x,y);if(d&&!d.surface&&!seen.has(d.id)){seen.add(d.id);revealPocket(d)}}
+}
+
+function terrainExposed(z){
+  liquidInit();
+  if(!z?.game?.terrain)return true;
+  const cx=z.game.cx,cy=z.game.cy;
+  if(cy===0)return true;
+  const open=(x,y)=>removedTerrain.has(key(x,y))||naturalOpen.has(key(x,y));
+  return open(cx,cy-1)||open(cx+1,cy)||(cy+1<DEPTH&&open(cx,cy+1))||open(cx-1,cy)
+}
+
+M.obsidian={taps:10,d:.0043,f:.96,r:.015,a:.006,col:['#201d2c','#121019']};
+function createObsidian(x,y,o={}){
+  const cx=cell(x),cy=cell(y),px=ctr(cx),py=ctr(cy);
+  const near=Query.region([...bs],{min:{x:px-B*.38,y:py-B*.38},max:{x:px+B*.38,y:py+B*.38}}).find(z=>z.game?.worldProduct&&z.game.material==='obsidian');
+  if(near)return near;
+  const z=mk(px,py,'obsidian',{w:B*.72,h:B*.72});z.game.worldProduct=true;z.game.cost=0;
+  if(o.angle)Body.setAngle(z,o.angle);return z
+}
+
+// Save liquids, opened pockets, and reaction-created obsidian alongside old saves.
+function saveGame(){
+  liquidInit();if(resetting)return;
+  try{
+    const placed=[];for(const z of bs)if(z.game?.placed)placed.push({material:z.game.material,x:z.position.x,y:z.position.y,w:z.game.w,h:z.game.h,cost:z.game.cost,hits:z.game.hits||0,angle:z.angle,vx:z.velocity.x,vy:z.velocity.y,av:z.angularVelocity});
+    const products=[];for(const z of bs)if(z.game?.worldProduct)products.push({material:z.game.material,x:z.position.x,y:z.position.y,w:z.game.w,h:z.game.h,hits:z.game.hits||0,angle:z.angle,vx:z.velocity.x,vy:z.velocity.y,av:z.angularVelocity});
+    const workerData=[];for(const q of miners)workerData.push({id:q.game.id,level:q.game.level,gold:q.game.gold,dir:q.game.dir,x:q.position.x,y:q.position.y,angle:q.angle,vx:q.velocity.x,vy:q.velocity.y,av:q.angularVelocity});
+    const fluidData=[];for(const q of fluids)fluidData.push({kind:q.game.liquid,x:q.position.x,y:q.position.y,vx:q.velocity.x,vy:q.velocity.y});
+    const s={v:1,savedAt:Date.now(),best,deepslateUnlocked:deepslate,inv:{...inv},deadMiners,restingMiners,removed:[...removedTerrain],damage:[...terrainDamage.entries()],placed,miners:workerData,cam:{x:cam.x,y:cam.y},fluidSeeded:[...fluidSeeded],revealedPockets:[...revealedPockets],fluids:fluidData,products};
+    localStorage.setItem(SAVE_KEY,JSON.stringify(s));lastSavedAt=performance.now()
+  }catch(e){console.warn('Save failed',e)}
+}
+
+function restoreDynamicState(s){
+  liquidInit();if(!s)return;restoring=true;
+  if(Array.isArray(s.placed))for(const p of s.placed){if(!M[p.material]||p.material==='bedrock')continue;ensureChunkAtX(finite(p.x));mk(finite(p.x),finite(p.y),p.material,{placed:true,w:Math.max(4,finite(p.w)||B-1),h:Math.max(4,finite(p.h)||B-1),cost:Math.max(1,Math.floor(finite(p.cost)||1)),hits:Math.max(0,Math.floor(finite(p.hits))),angle:finite(p.angle),velocity:{x:finite(p.vx),y:finite(p.vy)},angularVelocity:finite(p.av)})}
+  if(Array.isArray(s.products))for(const p of s.products){if(p.material!=='obsidian')continue;ensureChunkAtX(finite(p.x));const z=createObsidian(finite(p.x),finite(p.y),{angle:finite(p.angle)});z.game.hits=Math.max(0,Math.floor(finite(p.hits)));Body.setVelocity(z,{x:finite(p.vx),y:finite(p.vy)});Body.setAngularVelocity(z,finite(p.av))}
+  if(Array.isArray(s.miners))for(const m of s.miners){ensureChunkAtX(finite(m.x));createMinerAt(finite(m.x),finite(m.y),{id:m.id,level:m.level,gold:m.gold,dir:m.dir,angle:finite(m.angle),velocity:{x:finite(m.vx),y:finite(m.vy)},angularVelocity:finite(m.av)})}
+  if(Array.isArray(s.fluids))for(const f of s.fluids)if(f.kind==='water'||f.kind==='lava'){ensureChunkAtX(finite(f.x));createFluid(f.kind,finite(f.x),finite(f.y),{velocity:{x:finite(f.vx),y:finite(f.vy)}})}
+  const earned=minerCountAt(best),accounted=miners.size+restingMiners.length+deadMiners;for(let i=accounted;i<earned;i++)restingMiners.push({id:++minerId,level:1,gold:0});
+  restingMiners.forEach(r=>minerId=Math.max(minerId,r.id||0));restoring=false
+}
+
+function harvest(z,collector='player',miner=null){
+  liquidInit();
+  if(z.game.material==='bedrock')return 0;
+  if(z.game.worldProduct){bs.delete(z);World.remove(eng.world,z);wake();wakeFluids();saveSoon();return 0}
+  inv[z.game.material]=(inv[z.game.material]||0)+(z.game.cost||1);let gold=0,cx=null,cy=null;
+  if(z.game.terrain){
+    cx=z.game.cx;cy=z.game.cy;const k=key(cx,cy);gold=goldAt(cx,cy);grid.delete(k);removedTerrain.add(k);terrainDamage.delete(k);
+    if(z.game.material==='deepslate'&&!deepslate){deepslate=true;toast('★ DEEPSLATE DISCOVERED! ★',true);SkyAudio.unlock()}
+    if(gold>0){goldBurst(z.position.x,z.position.y,gold,collector==='miner');if(collector==='miner'&&miner){miner.game.gold+=gold;toast('YOUR MINER FOUND GOLD...\nAND POCKETED IT 👀',true)}else{inv.gold+=gold;toast('★ GOLD! +'+gold+' ★',true)}}
+  }
+  bs.delete(z);World.remove(eng.world,z);wake();wakeFluids();if(cx!==null)revealPocketsAround(cx,cy);ui();saveSoon();return gold
+}
+
+// Buried blocks now fail silently; their dark rendering is the only feedback.
+function mine(p){
+  const z=at(p);if(!z)return;
+  if(z.game.material==='bedrock'){toast('BEDROCK WON’T BUDGE.');return}
+  if(z.game.terrain&&!terrainExposed(z))return;
+  if(z.game.material==='stone'&&!stone){toast('🔒 STONE LOCKED\nReach 10 m first!',true);return}
+  z.game.hits++;z.game.flash=7;if(z.game.terrain)terrainDamage.set(key(z.game.cx,z.game.cy),z.game.hits);
+  const broken=z.game.hits>=z.game.max;SkyAudio.hit(z.game.material,broken,z.game.hits);if(broken)harvest(z,'player');else saveSoon()
+}
+function mineableNear(q){const r=B*1.18,m=minerMaterial(q);return Query.region([...bs],{min:{x:q.position.x-r,y:q.position.y-r},max:{x:q.position.x+r,y:q.position.y+r}}).filter(z=>z.game?.terrain&&z.game.material===m&&terrainExposed(z))}
+
+function frontier(){
+  const cx=cell(cam.x);let dug=false;
+  for(let cy=0;cy<DEPTH;cy++){
+    const k=key(cx,cy);
+    if(removedTerrain.has(k))dug=true;
+    else if(digSafe(dug,cy)&&grid.has(k))return{x:ctr(cx),y:ctr(cy)}
+  }
+  return{x:ctr(cx),y:ctr(DEPTH-1)}
+}
+function digSafe(dug,cy){return dug||cy===0}
+
+function liquidBuckets(){
+  liquidInit();const map=new Map();
+  for(const q of fluids){const k=key(cell(q.position.x),cell(q.position.y));if(!map.has(k))map.set(k,[]);map.get(k).push(q)}
+  return map
+}
+function reactLiquids(now){
+  if(now-lastLiquidReaction<110)return;lastLiquidReaction=now;
+  const buckets=liquidBuckets(),used=new Set();let made=0;
+  for(const w of fluids){
+    if(w.game.liquid!=='water'||used.has(w))continue;
+    const cx=cell(w.position.x),cy=cell(w.position.y);let hit=null;
+    for(let dy=-1;dy<=1&&!hit;dy++)for(let dx=-1;dx<=1&&!hit;dx++)for(const q of buckets.get(key(cx+dx,cy+dy))||[]){
+      if(q.game.liquid==='lava'&&!used.has(q)&&Math.hypot(q.position.x-w.position.x,q.position.y-w.position.y)<13){hit=q;break}
+    }
+    if(hit){
+      used.add(w);used.add(hit);const x=(w.position.x+hit.position.x)/2,y=(w.position.y+hit.position.y)/2;
+      removeFluid(w);removeFluid(hit);createObsidian(x,y,{angle:(hash01(cell(x),cell(y),501)-.5)*.08});made++;
+      if(window.SkyAudio?.sizzle)SkyAudio.sizzle();if(made>=5)break
+    }
+  }
+  if(made){wake();saveSoon()}
+}
+
+function updateBuoyancy(){
+  liquidInit();const all=[...fluids];if(!all.length)return;
+  for(const z of bs){
+    if(!z.game?.placed||z.isStatic)continue;
+    const touching=Query.region(all,z.bounds).filter(q=>q.game?.liquid==='water');
+    if(!touching.length){wetBodies.delete(z);continue}
+    const cells=Math.max(1,(z.game.w*z.game.h)/(B*B)),coverage=clamp(touching.length/(cells*3),0,1);
+    if(z.game.material==='dirt'){
+      Body.applyForce(z,z.position,{x:0,y:-z.mass*.00145*(.55+coverage)});
+      Body.setVelocity(z,{x:z.velocity.x*.985,y:z.velocity.y*.965});Body.setAngularVelocity(z,z.angularVelocity*.985)
+    }else if(z.game.material==='stone'||z.game.material==='deepslate'||z.game.material==='obsidian'){
+      Body.applyForce(z,z.position,{x:0,y:z.mass*.00028*(.35+coverage)});Body.setVelocity(z,{x:z.velocity.x*.99,y:z.velocity.y*.99})
+    }
+    if(!wetBodies.has(z)){wetBodies.add(z);if(window.SkyAudio?.splash)SkyAudio.splash('water')}
+  }
+}
+function updateLiquids(now){liquidInit();reactLiquids(now);if((++liquidFrame&1)===0)updateBuoyancy()}
+
+function drawFluids(now){
+  liquidInit();
+  for(const q of fluids){
+    const s=w2s(q.position.x,q.position.y),size=13*cam.z;if(s.x+size<0||s.x-size>W||s.y+size<0||s.y-size>HH)continue;
+    const lava=q.game.liquid==='lava',pulse=lava?(Math.sin(now/170+q.game.id*.7)+1)*.5:0;
+    ctx.save();ctx.translate(s.x,s.y);ctx.rotate(q.angle);ctx.globalAlpha=lava?.9:.70;
+    ctx.fillStyle=lava?(pulse>.5?'#ff7430':'#e84b24'):'#2d8fdd';ctx.fillRect(-size/2,-size/2,size,size);
+    ctx.globalAlpha=lava?.92:.58;ctx.fillStyle=lava?'#ffd052':'#8ed8ff';ctx.fillRect(-size*.28,-size*.31,size*.38,size*.28);
+    ctx.restore()
+  }
+}
