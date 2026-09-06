@@ -1,0 +1,172 @@
+
+// --- v19 SLOWER TERRARIA-STYLE OVERFLOW -------------------------------------------
+// Separates quiet basin equalization from edge spilling, adds a brief lip hesitation,
+// and renders unsupported flow as continuous narrow waterfalls instead of blocky cells.
+var liquidSpillChargeV19,liquidSpillStreamsV19;
+SKY_BUILD='v19';
+
+function liquidFlowInitV19(){
+  liquidGridInitV18();
+  if(!liquidSpillChargeV19)liquidSpillChargeV19=new Map();
+  if(!liquidSpillStreamsV19)liquidSpillStreamsV19=new Map()
+}
+function liquidHeadV19(x,y,kind){
+  let h=0;
+  for(let i=1;i<=3;i++){
+    const r=liquidRecV18(x,y-i);if(!r||r.kind!==kind||r.a<.55)break;h++
+  }
+  return h
+}
+function liquidSupportedV19(x,y,kind){
+  if(!liquidOpenV18(x,y+1))return true;
+  const b=liquidRecV18(x,y+1);
+  return !!b&&b.kind===kind&&b.a>.92
+}
+function liquidSpillKeyV19(src,dir){return src.kind+':'+src.x+','+src.y+':'+dir}
+function liquidChargeV19(src,dir,now){
+  liquidFlowInitV19();const k=liquidSpillKeyV19(src,dir),old=liquidSpillChargeV19.get(k);
+  const q=old&&now-old.last<520?old:{c:0,last:now};
+  const head=liquidHeadV19(src.x,src.y,src.kind),lava=src.kind==='lava';
+  q.c=Math.min(1,q.c+(lava?.065:.16)+head*(lava?.018:.035));q.last=now;liquidSpillChargeV19.set(k,q);return q
+}
+function liquidNoteSpillV19(src,dir,moved,now){
+  if(moved<=.001)return;liquidFlowInitV19();const k=liquidSpillKeyV19(src,dir),old=liquidSpillStreamsV19.get(k);
+  const target=Math.min(1,moved*(src.kind==='lava'?18:11));
+  liquidSpillStreamsV19.set(k,{x:src.x,y:src.y,dir,kind:src.kind,strength:Math.min(1,(old?.strength||0)*.72+target),last:now})
+}
+function liquidCleanupFlowV19(now){
+  if(!liquidSpillChargeV19||!liquidSpillStreamsV19)return;
+  for(const [k,q] of liquidSpillChargeV19)if(now-q.last>1800)liquidSpillChargeV19.delete(k);
+  for(const [k,q] of liquidSpillStreamsV19)if(now-q.last>720)liquidSpillStreamsV19.delete(k)
+}
+
+function liquidStepKindV18(kind){
+  liquidFlowInitV19();
+  const centerCh=Math.floor(cam.x/(24*B)),range=3,arr=[];
+  for(const r of liquidCellsV18.values())if(r.kind===kind&&Math.abs(Math.floor(r.x/24)-centerCh)<=range)arr.push(r);
+  const flip=(liquidTickV18&1)?1:-1,now=performance.now();
+  arr.sort((a,b)=>b.y-a.y||flip*(a.x-b.x));
+  const lava=kind==='lava';
+  for(const src of arr){
+    if(src.a<=.002)continue;
+    const head=liquidHeadV19(src.x,src.y,kind);
+    // Free fall is intentionally much slower than v18. Pressure from liquid above
+    // can increase the pour, but never causes a whole cell to teleport at once.
+    const downWant=Math.min(lava?.16:.34,(lava?.075:.20)+head*(lava?.022:.045));
+    liquidMoveV18(src,src.x,src.y+1,downWant);
+    if(src.a<=.012)continue;
+
+    // Water only levels sideways once it has support beneath it. This prevents a
+    // falling stream from instantly fanning out in mid-air.
+    if(!liquidSupportedV19(src.x,src.y,kind))continue;
+    const dirs=flip>0?[1,-1]:[-1,1];
+    for(const dx of dirs){
+      if(src.a<=.012)break;
+      const nx=src.x+dx,ny=src.y;if(!liquidOpenV18(nx,ny))continue;
+      const n=liquidRecV18(nx,ny);if(n&&n.kind!==kind)continue;
+      const na=n?n.a:0,diff=src.a-na;if(diff<=.035)continue;
+      const unsupportedDest=liquidOpenV18(nx,ny+1)&&!liquidSupportedV19(nx,ny,kind);
+      if(unsupportedDest){
+        // Edge overflow has a brief surface-tension-like hesitation at the lip.
+        // Once established, the stream stays primed instead of repeatedly stopping.
+        const q=liquidChargeV19(src,dx,now),threshold=lava?.66:.48;
+        if(q.c<threshold)continue;
+        const pressure=liquidHeadV19(src.x,src.y,kind);
+        const want=Math.min(diff*.28,lava?(.016+pressure*.005):(.055+pressure*.014));
+        const moved=liquidMoveV18(src,nx,ny,want);
+        if(moved>.001){q.c=Math.max(threshold*.82,q.c-(lava?.055:.085));liquidNoteSpillV19(src,dx,moved,now)}
+      }else{
+        // Calm water inside a basin levels more gently than v18 but faster than a
+        // waterfall, keeping lakes from taking forever to settle.
+        const want=Math.min(lava?.038:.105,diff*(lava?.16:.24));
+        liquidMoveV18(src,nx,ny,want)
+      }
+    }
+  }
+  liquidDeleteTinyV18();if(liquidTickV18%30===0)liquidCleanupFlowV19(now)
+}
+
+function updateLiquids(now){
+  liquidFlowInitV19();liquidTickV18++;
+  // One water solve at ~12 Hz makes pours readable and satisfying. Lava runs at ~6 Hz.
+  if(liquidTickV18%5===0){liquidStepKindV18('water');updateBuoyancyV18()}
+  if(liquidTickV18%10===0)liquidStepKindV18('lava');
+  liquidReactV18(now)
+}
+
+function liquidPoolCellV19(r,now){
+  const s=w2s(ctr(r.x),ctr(r.y)),sz=B*cam.z,bottom=s.y+sz/2,h=Math.max(1,sz*clamp(r.a,0,1));
+  if(bottom<0||bottom-h>HH)return;
+  const top=bottom-h,lava=r.kind==='lava',below=liquidRecV18(r.x,r.y+1);
+  const falling=liquidOpenV18(r.x,r.y+1)&&(!below||below.kind!==r.kind||below.a<.86)&&r.a<.72;
+  ctx.save();
+  if(falling){
+    // Unsupported liquid is drawn as a narrow continuous stream, hiding the grid
+    // cell underneath without increasing simulation complexity.
+    const w=sz*(lava?.26:.19+Math.min(.13,r.a*.13));
+    ctx.globalAlpha=lava?.9:.70;ctx.fillStyle=lava?'#e94b20':'#168cda';
+    ctx.fillRect(s.x-w/2,s.y-sz/2-.5,w,sz+1);
+    ctx.globalAlpha=lava?.55:.28;ctx.fillStyle=lava?'#ffb13f':'#d8f5ff';
+    ctx.fillRect(s.x-w*.22,s.y-sz/2,w*.22,sz);
+    ctx.restore();return
+  }
+  ctx.globalAlpha=lava?.92:.72;ctx.fillStyle=lava?'#e94b20':'#168cda';
+  ctx.fillRect(s.x-sz/2-.6,top,sz+1.2,h+.8);
+  if(lava){
+    ctx.globalAlpha=.52;ctx.fillStyle='#ff8a2e';ctx.fillRect(s.x-sz/2,Math.max(top,bottom-h*.62),sz,h*.24);
+    const pulse=(Math.sin(now/180+r.x*.61+r.y*.33)+1)*.5;
+    ctx.globalAlpha=.35+pulse*.2;ctx.fillStyle='#ffd158';ctx.fillRect(s.x-sz*.25,bottom-h*.48,sz*.5,Math.max(1,sz*.08))
+  }else{
+    ctx.globalAlpha=.18;ctx.fillStyle='#d8f5ff';ctx.fillRect(s.x-sz/2,Math.max(top,bottom-h*.72),sz,h*.18)
+  }
+  const above=liquidRecV18(r.x,r.y-1),covered=above&&above.kind===r.kind&&above.a>.06;
+  if(!covered){
+    const amp=Math.min(2.2,1.25*cam.z),ph=now*(lava?.00135:.0019)+r.x*.48;
+    const yL=top+Math.sin(ph)*amp,yM=top+Math.sin(ph+.5)*amp,yR=top+Math.sin(ph+1)*amp;
+    ctx.globalAlpha=lava?.82:.70;ctx.strokeStyle=lava?'#ffd45c':'#b9edff';ctx.lineWidth=Math.max(1,1.45*cam.z);
+    ctx.beginPath();ctx.moveTo(s.x-sz/2-.5,yL);ctx.quadraticCurveTo(s.x,yM,s.x+sz/2+.5,yR);ctx.stroke()
+  }
+  ctx.restore()
+}
+function drawSpillStreamsV19(now){
+  liquidFlowInitV19();
+  for(const [k,sp] of liquidSpillStreamsV19){
+    const age=now-sp.last;if(age>720){liquidSpillStreamsV19.delete(k);continue}
+    const src=liquidRecV18(sp.x,sp.y);if(!src||src.kind!==sp.kind||src.a<.025)continue;
+    const fade=clamp(1-age/720,0,1),lava=sp.kind==='lava',dx=sp.dir,nx=sp.x+dx;
+    const sourceBottom=(sp.y+1)*B,sourceTop=sourceBottom-src.a*B;
+    const lipX=(sp.x+(dx>0?1:0))*B,streamX=lipX+dx*B*.15;
+    let endY=sourceTop+B*.55;
+    for(let yy=sp.y;yy<=sp.y+12;yy++){
+      if(!liquidOpenV18(nx,yy)){endY=yy*B;break}
+      const r=liquidRecV18(nx,yy);
+      if(yy>sp.y&&r&&r.kind===sp.kind&&r.a>.16){endY=(yy+1)*B-r.a*B;break}
+      endY=(yy+1)*B
+    }
+    const a=w2s(lipX-dx*B*.12,sourceTop+B*.02),b=w2s(streamX,sourceTop+B*.18),c=w2s(streamX,endY);
+    if((a.x<-30&&c.x<-30)||(a.x>W+30&&c.x>W+30)||Math.min(a.y,c.y)>HH+40||Math.max(a.y,c.y)<-40)continue;
+    const width=Math.max(2,B*cam.z*(lava?.09:.065)*(1+sp.strength*(lava?.85:1.25)));
+    ctx.save();ctx.globalAlpha=(lava?.88:.68)*fade;ctx.lineCap='round';ctx.lineJoin='round';
+    ctx.strokeStyle=lava?'#e94b20':'#168cda';ctx.lineWidth=width;
+    ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.quadraticCurveTo(b.x,b.y,c.x,c.y);ctx.stroke();
+    ctx.globalAlpha=(lava?.58:.30)*fade;ctx.strokeStyle=lava?'#ffd45c':'#d8f5ff';ctx.lineWidth=Math.max(1,width*.24);
+    ctx.beginPath();ctx.moveTo(a.x-dx*width*.12,a.y);ctx.quadraticCurveTo(b.x-dx*width*.10,b.y,c.x-dx*width*.08,c.y);ctx.stroke();
+    // Small impact ripple where the falling stream meets a pool/ledge.
+    ctx.globalAlpha=(lava?.38:.22)*fade;ctx.strokeStyle=lava?'#ffae3e':'#9fe4ff';ctx.lineWidth=Math.max(1,width*.18);
+    ctx.beginPath();ctx.ellipse(c.x,c.y,Math.max(2,width*.9),Math.max(1,width*.24),0,0,Math.PI*2);ctx.stroke();ctx.restore()
+  }
+}
+
+function drawMappedLiquids(now){
+  liquidFlowInitV19();
+  const left=cam.x-W/(2*cam.z)-B,right=cam.x+W/(2*cam.z)+B;
+  for(const r of liquidCellsV18.values()){
+    if(r.a<=.004)continue;const wx=ctr(r.x);if(wx<left||wx>right)continue;liquidPoolCellV19(r,now)
+  }
+  drawSpillStreamsV19(now)
+}
+
+window.__skyStackLiquidDebug=()=>{
+  liquidFlowInitV19();let water=0,lava=0,volume=0;for(const r of liquidCellsV18.values()){if(r.kind==='water')water++;else lava++;volume+=r.a}
+  return{build:'v19',cells:liquidCellsV18.size,water,lava,volume:+volume.toFixed(2),activeSpills:liquidSpillStreamsV19.size}
+};
