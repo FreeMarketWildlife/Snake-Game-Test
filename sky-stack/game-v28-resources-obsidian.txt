@@ -1,0 +1,158 @@
+// --- v28 DEEP RESOURCES / GRID OBSIDIAN -------------------------------------------
+// Richer deep gold, hidden deepslate diamonds, level-3 miner profit sharing, and a
+// true terrain-grid obsidian reaction so incoming water naturally pools above it.
+SKY_BUILD='v28';
+
+// Diamonds are save-backed through the existing inventory spread. Older saves simply
+// start at zero, and the HUD stays completely hidden until deepslate is unlocked.
+inv.diamond=Math.max(0,Math.floor(finite(initialSave?.inv?.diamond)));
+var v28BaseUi=ui;
+ui=function(){
+  v28BaseUi();
+  const hud=$('diamondHud'),count=$('diamondCount');
+  if(hud)hud.hidden=!deepslate;
+  if(count)count.textContent=inv.diamond
+};
+
+// Keep early-game gold familiar, then make deposits dramatically richer with depth.
+goldAt=function(cx,cy){
+  if(cy<1||cy>=BEDROCK_START)return 0;
+  const deep=clamp((cy-18)/(BEDROCK_START-18),0,1),REGION=11;
+  const rx=Math.floor(cx/REGION),ry=Math.floor(cy/REGION);let bestInfluence=0,coreLuck=0;
+  const depositChance=.38+deep*.20;
+  for(let oy=-1;oy<=1;oy++)for(let ox=-1;ox<=1;ox++){
+    const gx=rx+ox,gy=ry+oy;if(hash01(gx,gy,71)>depositChance)continue;
+    const centerX=gx*REGION+2+Math.floor(hash01(gx,gy,72)*(REGION-4));
+    const centerY=gy*REGION+2+Math.floor(hash01(gx,gy,73)*(REGION-4));
+    const dx=cx-centerX,dy=cy-centerY,d=Math.sqrt(dx*dx+dy*dy);let influence=0;
+    if(d<=1.25)influence=.78;else if(d<=2.45)influence=.48;else if(d<=3.7)influence=.22;else if(d<=5)influence=.055+deep*.035;
+    if(influence>bestInfluence){bestInfluence=influence;coreLuck=hash01(centerX,centerY,74)}
+  }
+  if(bestInfluence===0&&hash01(cx,cy,75)<.004+deep*.006)bestInfluence=.2+deep*.08;
+  const findChance=Math.min(.95,bestInfluence*(1+deep*.35));
+  if(bestInfluence===0||hash01(cx,cy,76)>=findChance)return 0;
+  const richness=hash01(cx,cy,77);let base=1;
+  if(bestInfluence>.6&&coreLuck>.6&&richness>.86)base=3;else if(bestInfluence>.4&&richness>.72)base=2;
+  const mult=1+Math.floor(deep*4),bonus=deep>.30?Math.floor(hash01(cx,cy,78)*(1+deep*5)):0;
+  return base*mult+bonus
+};
+
+// Small deterministic diamond pockets exist only inside actual deepslate terrain.
+function diamondAtV28(cx,cy,material){
+  if(material!=='deepslate'||cy<STONE_END-2||cy>=BEDROCK_START)return 0;
+  const REGION=10,rx=Math.floor(cx/REGION),ry=Math.floor(cy/REGION);let influence=0,core=0;
+  for(let oy=-1;oy<=1;oy++)for(let ox=-1;ox<=1;ox++){
+    const gx=rx+ox,gy=ry+oy;if(hash01(gx,gy,2801)>.22)continue;
+    const centerX=gx*REGION+2+Math.floor(hash01(gx,gy,2802)*(REGION-4));
+    const centerY=gy*REGION+2+Math.floor(hash01(gx,gy,2803)*(REGION-4));
+    const dx=cx-centerX,dy=cy-centerY,d=Math.sqrt(dx*dx+dy*dy);let p=0;
+    if(d<=1.05)p=.76;else if(d<=1.85)p=.42;else if(d<=2.55)p=.13;
+    if(p>influence){influence=p;core=hash01(centerX,centerY,2804)}
+  }
+  if(influence===0||hash01(cx,cy,2805)>=influence)return 0;
+  return influence>.7&&core>.88&&hash01(cx,cy,2806)>.82?2:1
+}
+
+// Water pockets are now discovered silently. Lava keeps its warning.
+revealPocket=function(d){
+  liquidInit();if(!d||revealedPockets.has(d.id))return;
+  revealedPockets.add(d.id);removeReservoirVisual(d);wakeFluids();
+  if(window.SkyAudio?.splash)SkyAudio.splash(d.kind);
+  if(!d.surface&&d.kind==='lava')toast('🔥 LAVA POCKET!',true);
+  saveSoon()
+};
+
+// A grid product is solid world geometry, so it must stop counting as an open pocket
+// when neighboring terrain checks whether it is exposed.
+terrainExposed=function(z){
+  liquidInit();if(!z?.game?.terrain)return true;
+  const cx=z.game.cx,cy=z.game.cy;if(cy===0)return true;
+  const accessibleOpen=(x,y)=>{
+    const k=key(x,y);if(grid.has(k))return false;
+    if(removedTerrain.has(k))return true;
+    const p=pocketForCell(x,y);return !!p&&(p.surface||revealedPockets.has(p.id))
+  };
+  return accessibleOpen(cx,cy-1)||accessibleOpen(cx+1,cy)||(cy+1<DEPTH&&accessibleOpen(cx,cy+1))||accessibleOpen(cx-1,cy)
+};
+
+// Obsidian now snaps to a full 1x1 static terrain cell and is registered in `grid`.
+// That makes it a real floor/wall to the liquid solver instead of a loose physics pebble.
+createObsidian=function(x,y,o={}){
+  const cx=cell(x),cy=cell(y),k=key(cx,cy),existing=grid.get(k);
+  if(existing)return existing.game?.material==='obsidian'?existing:null;
+  const z=mk(ctr(cx),ctr(cy),'obsidian',{static:true,terrain:true,cx,cy,w:B-1,h:B-1,hits:Math.max(0,Math.floor(finite(o.hits)))});
+  z.game.worldProduct=true;z.game.cost=0;z.game.placed=false;z.game.born=performance.now();
+  Body.setAngle(z,0);return z
+};
+
+// Resource payout override: level 3 miners automatically bank half of every gold find
+// for the player (odd finds round in the player's favor). Diamonds always bank directly.
+harvest=function(z,collector='player',miner=null){
+  liquidInit();if(!z?.game)return 0;
+  if(z.game.material==='bedrock')return 0;
+  if(z.game.worldProduct){
+    if(z.game.terrain&&z.game.cx!==null&&z.game.cy!==null){const k=key(z.game.cx,z.game.cy);if(grid.get(k)===z)grid.delete(k);terrainDamage.delete(k)}
+    bs.delete(z);World.remove(eng.world,z);wake();wakeFluids();ui();saveSoon();return 0
+  }
+  inv[z.game.material]=(inv[z.game.material]||0)+(z.game.cost||1);let gold=0,diamond=0,cx=null,cy=null;
+  if(z.game.terrain){
+    cx=z.game.cx;cy=z.game.cy;const k=key(cx,cy);gold=goldAt(cx,cy);diamond=diamondAtV28(cx,cy,z.game.material);
+    grid.delete(k);removedTerrain.add(k);terrainDamage.delete(k);
+    if(z.game.material==='deepslate'&&!deepslate){deepslate=true;toast('★ DEEPSLATE DISCOVERED! ★',true);SkyAudio.unlock()}
+    if(gold>0){
+      if(collector==='miner'&&miner){
+        if(miner.game.level>=3){
+          const share=Math.ceil(gold/2),kept=gold-share;inv.gold+=share;miner.game.gold+=kept;
+          if(share>0)goldBurst(z.position.x,z.position.y,share,false)
+        }else{
+          miner.game.gold+=gold;goldBurst(z.position.x,z.position.y,gold,true);toast('YOUR MINER FOUND GOLD...\nAND POCKETED IT 👀',true)
+        }
+      }else{inv.gold+=gold;goldBurst(z.position.x,z.position.y,gold,false);toast('★ GOLD! +'+gold+' ★',true)}
+    }
+    if(diamond>0){
+      inv.diamond+=diamond;
+      toast((collector==='miner'?'◆ MINER FOUND DIAMOND! +':'◆ DIAMOND! +')+diamond+' ◆',true)
+    }
+  }
+  bs.delete(z);World.remove(eng.world,z);wake();wakeFluids();if(cx!==null)revealPocketsAround(cx,cy);ui();saveSoon();return gold
+};
+
+var v28BaseRefreshMinerMenu=refreshMinerMenu;
+refreshMinerMenu=function(){
+  v28BaseRefreshMinerMenu();
+  if(selectedMiner&&miners.has(selectedMiner)&&selectedMiner.game.level>=3){
+    $('minerDesc').textContent='He mines deepslate and automatically shares half of every gold find with you.'
+  }
+};
+
+function liquidClearWorldCellV28(cx,cy){
+  liquidV22Init();const sc=liquidSubScaleV22||2;
+  for(let sy=cy*sc;sy<(cy+1)*sc;sy++)for(let sx=cx*sc;sx<(cx+1)*sc;sx++)liquidSubV22.delete(liquidSubKeyV22(sx,sy))
+}
+
+// Contact reaction runs every liquid update: consume the contacting water sub-cell,
+// cool the lava's whole world cell into obsidian, and leave upstream water untouched.
+// Because the new obsidian is in `grid`, all following water naturally pools on top.
+liquidReactV22=function(now){
+  liquidV22Init();let made=0;const sc=liquidSubScaleV22||2,cooled=new Set(),vals=[...liquidSubV22.values()];
+  for(const w of vals){
+    if(w.kind!=='water'||w.a<.015||!liquidSubV22.has(liquidSubKeyV22(w.x,w.y)))continue;
+    for(const d of [[0,1],[1,0],[-1,0],[0,-1]]){
+      const l=liquidSubRecV22(w.x+d[0],w.y+d[1]);if(!l||l.kind!=='lava'||l.a<.015)continue;
+      const ocx=Math.floor(l.x/sc),ocy=Math.floor(l.y/sc),ok=key(ocx,ocy);if(cooled.has(ok))continue;
+      const contactKey=liquidSubKeyV22(w.x,w.y);
+      liquidSubV22.delete(contactKey);
+      liquidClearWorldCellV28(ocx,ocy);
+      const obs=createObsidian(ctr(ocx),ctr(ocy));
+      if(obs){cooled.add(ok);made++;if(window.SkyAudio?.sizzle)SkyAudio.sizzle()}
+      break
+    }
+    if(made>=12)break
+  }
+  if(made){wake();saveSoon()}
+};
+
+window.__skyStackResourceDebug=()=>({
+  build:'v28',gold:inv.gold,diamonds:inv.diamond,deepslateUnlocked:deepslate,
+  gridObsidian:[...bs].filter(z=>z.game?.worldProduct&&z.game.material==='obsidian').length
+});
