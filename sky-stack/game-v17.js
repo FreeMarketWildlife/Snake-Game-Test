@@ -12,7 +12,8 @@ const liquidParts=[
   'game-v13-liquid-visibility.txt?v=17',
   'game-v14-liquid-guarantee.txt?v=17',
   'game-v15-liquid-diagnostic.txt?v=17',
-  'game-v17-liquid-tuning.txt?v=17'
+  'game-v17-liquid-tuning.txt?v=17',
+  'game-v17-seedfix.txt?v=17'
 ];
 const tailUrl='game-v8-part3.txt?v=17';
 
