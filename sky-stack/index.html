@@ -9,6 +9,7 @@
   <meta http-equiv="Expires" content="0">
   <title>Sky Stack</title>
   <link rel="stylesheet" href="style.css?v=7">
+  <link rel="stylesheet" href="style-v25.css?v=25">
 </head>
 <body>
 <div id="app">
@@ -37,11 +38,13 @@
   </div>
 
   <div id="mode" class="box">MAX 1×1</div>
+  <button class="btn" id="gridToggle" aria-pressed="true">▦ GRID ON</button>
   <button class="btn" id="tipBtn">💡</button>
 
   <div id="tips" class="box">
     <b>💡 QUICK TIPS</b>
     <p>✋ MOVE lets you drag around safely.</p>
+    <p>▦ GRID ON snaps builds to world cells. GRID OFF gives you free placement.</p>
     <p>⛏ Tap exposed blocks to mine. Dark buried blocks must touch open space first.</p>
     <p>💧 Dirt floats in water. Stone and deepslate sink.</p>
     <p>🔥 Water touching lava cools into solid obsidian.</p>
@@ -85,6 +88,6 @@
 </div>
 <script src="https://cdn.jsdelivr.net/npm/matter-js@0.20.0/build/matter.min.js"></script>
 <script src="audio.js?v=4"></script>
-<script src="game-v24.js"></script>
+<script src="game-v25.js"></script>
 </body>
 </html>
