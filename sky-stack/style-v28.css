@@ -1,0 +1,9 @@
+#diamondHud{padding:7px 8px;min-width:62px}
+#diamondHud small{font-size:8px;font-weight:900;opacity:.65}
+#diamondHud b{display:block;font-size:15px;color:#39758f}
+#diamondHud b:first-letter{color:#8de7ff;text-shadow:1px 1px 0 #31596f}
+#diamondHud[hidden]{display:none!important}
+@media (max-width:370px){
+  #diamondHud{padding-left:6px;padding-right:6px;min-width:56px}
+  .hudLeft{gap:4px}
+}
