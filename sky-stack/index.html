@@ -10,6 +10,7 @@
   <title>Sky Stack</title>
   <link rel="stylesheet" href="style.css?v=7">
   <link rel="stylesheet" href="style-v25.css?v=25">
+  <link rel="stylesheet" href="style-v28.css?v=28">
 </head>
 <body>
 <div id="app">
@@ -19,6 +20,7 @@
     <div class="hudLeft">
       <div class="height box"><small>HEIGHT</small><b id="height">0 m</b></div>
       <div id="goldHud" class="box"><small>GOLD</small><b>● <span id="gc">0</span></b></div>
+      <div id="diamondHud" class="box" hidden><small>DIAMOND</small><b>◆ <span id="diamondCount">0</span></b></div>
     </div>
     <div class="cams">
       <button class="btn" id="top">▲ TOP</button>
@@ -84,12 +86,12 @@
 
   <div id="killModal" class="modal" aria-hidden="true"><div class="modalCard box restartCard"><div class="warningIcon dangerIcon">!</div><b>KILL THIS MINER?</b><p>You will permanently lose this miner.</p><p class="warningText">You will recover the <b id="killGold">0</b> gold he is carrying. A killed miner does not return to your toolbar.</p><div class="modalActions"><button class="btn" id="killCancel">NEVER MIND</button><button class="btn danger" id="killConfirm">YES, KILL MINER</button></div></div></div>
 
-  <div id="restartModal" class="modal" aria-hidden="true"><div class="modalCard box restartCard"><div class="warningIcon">↻</div><b>RESTART SKY STACK?</b><p>This permanently deletes this world's locally saved progress in this browser.</p><p class="warningText">Your mined terrain, inventory, gold, placed blocks, height progress, and miners will all reset to the beginning.</p><label class="dontShow restartAgree"><input type="checkbox" id="restartAgree"> <span>I understand my saved world will be deleted.</span></label><div class="modalActions"><button class="btn" id="restartCancel">KEEP MY WORLD</button><button class="btn danger" id="restartConfirm" disabled>YES, START OVER</button></div></div></div>
+  <div id="restartModal" class="modal" aria-hidden="true"><div class="modalCard box restartCard"><div class="warningIcon">↻</div><b>RESTART SKY STACK?</b><p>This permanently deletes this world's locally saved progress in this browser.</p><p class="warningText">Your mined terrain, inventory, gold, diamonds, placed blocks, height progress, and miners will all reset to the beginning.</p><label class="dontShow restartAgree"><input type="checkbox" id="restartAgree"> <span>I understand my saved world will be deleted.</span></label><div class="modalActions"><button class="btn" id="restartCancel">KEEP MY WORLD</button><button class="btn danger" id="restartConfirm" disabled>YES, START OVER</button></div></div></div>
 
   <div id="toast" class="hide"></div><div id="load">Loading physics…</div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/matter-js@0.20.0/build/matter.min.js"></script>
 <script src="audio.js?v=5"></script>
-<script src="game-v27.js"></script>
+<script src="game-v28.js?v=28"></script>
 </body>
 </html>
