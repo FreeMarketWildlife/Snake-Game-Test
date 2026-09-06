@@ -1,0 +1,129 @@
+
+// --- v21 OFF-GRID LIQUID RENDER ---------------------------------------------------
+// Simulation remains on the conserved volume grid for performance and save stability,
+// but rendering no longer exposes individual falling cells. Connected falling cells are
+// merged into one sub-cell ribbon; pooled rows are merged into rounded continuous bands.
+var liquidRibbonPhaseV21;
+SKY_BUILD='v21';
+
+function liquidV21Init(){
+  liquidV20Init();
+  if(!Number.isFinite(liquidRibbonPhaseV21))liquidRibbonPhaseV21=hash01(21,21,2101)*Math.PI*2
+}
+function liquidFallingV21(r,now){
+  if(!r||r.a<=.003)return false;
+  if(liquidSupportedPoolV20(r))return false;
+  const m=liquidMotionV20At(r.x,r.y,r.kind,now);
+  return !!m?.down||liquidOpenV18(r.x,r.y+1)
+}
+function liquidPoolEdgeInsetV21(r,dir){
+  const n=liquidRecV18(r.x+dir,r.y);
+  if(n&&n.kind===r.kind&&n.a>.025)return 0;
+  const a=clamp(r.a,0,1);
+  return B*(.055+(1-a)*.11)
+}
+function liquidRoundedBandV21(run,now){
+  if(!run.length)return;
+  const kind=run[0].kind,lava=kind==='lava',y=run[0].y;
+  const leftR=run[0],rightR=run[run.length-1];
+  const left=leftR.x*B+liquidPoolEdgeInsetV21(leftR,-1),right=(rightR.x+1)*B-liquidPoolEdgeInsetV21(rightR,1);
+  const top=y*B,bottom=(y+1)*B;
+  const s0=w2s(left,top),s1=w2s(right,bottom),sz=B*cam.z,rad=Math.max(1,sz*(lava?.10:.16));
+  if(s1.x<0||s0.x>W||s1.y<0||s0.y>HH)return;
+  ctx.save();ctx.globalAlpha=lava?.92:.72;ctx.fillStyle=lava?'#e94b20':'#168cda';
+  const x=s0.x,y0=s0.y,w=s1.x-s0.x,h=s1.y-s0.y,r=Math.min(rad,Math.abs(w)/2,Math.abs(h)/2);
+  ctx.beginPath();ctx.moveTo(x+r,y0);ctx.lineTo(x+w-r,y0);ctx.quadraticCurveTo(x+w,y0,x+w,y0+r);ctx.lineTo(x+w,y0+h-r);ctx.quadraticCurveTo(x+w,y0+h,x+w-r,y0+h);ctx.lineTo(x+r,y0+h);ctx.quadraticCurveTo(x,y0+h,x,y0+h-r);ctx.lineTo(x,y0+r);ctx.quadraticCurveTo(x,y0,x+r,y0);ctx.closePath();ctx.fill();
+  if(lava){ctx.globalAlpha=.20;ctx.fillStyle='#ff9b35';ctx.fillRect(x+r*.8,y0+h*.26,Math.max(1,w-r*1.6),Math.max(1,h*.14))}
+  else{ctx.globalAlpha=.075;ctx.fillStyle='#d8f5ff';ctx.fillRect(x+r*.7,y0+h*.12,Math.max(1,w-r*1.4),Math.max(1,h*.09))}
+  ctx.restore()
+}
+function liquidDrawBodyBandsV21(now,left,right){
+  const byRow=new Map();
+  for(const r of liquidCellsV18.values()){
+    if(r.a<=.004||ctr(r.x)<left||ctr(r.x)>right||liquidSurfaceCellV20(r)||liquidFallingV21(r,now))continue;
+    const k=r.kind+':'+r.y;if(!byRow.has(k))byRow.set(k,[]);byRow.get(k).push(r)
+  }
+  for(const arr of byRow.values()){
+    arr.sort((a,b)=>a.x-b.x);let run=[];
+    for(const r of arr){if(run.length&&r.x!==run[run.length-1].x+1){liquidRoundedBandV21(run,now);run=[]}run.push(r)}
+    liquidRoundedBandV21(run,now)
+  }
+}
+function liquidDrawSurfaceRunV20(run,now){
+  if(!run.length)return;const kind=run[0].kind,lava=kind==='lava',y=run[0].y;
+  const leftInset=liquidPoolEdgeInsetV21(run[0],-1),rightInset=liquidPoolEdgeInsetV21(run[run.length-1],1);
+  const leftX=run[0].x*B+leftInset,rightX=(run[run.length-1].x+1)*B-rightInset,bottom=(y+1)*B;
+  const centers=run.map(r=>({x:ctr(r.x),y:liquidSurfaceHeightV20(r,now),r})),pts=[];
+  const edgeBlend=(a,b,t)=>a+(b-a)*t;
+  pts.push({x:leftX,y:edgeBlend(centers[0].y,bottom,.035)});for(const p of centers)pts.push({x:p.x,y:p.y});pts.push({x:rightX,y:edgeBlend(centers[centers.length-1].y,bottom,.035)});
+  const S=p=>w2s(p.x,p.y),a=S(pts[0]),br=S({x:rightX,y:bottom}),bl=S({x:leftX,y:bottom});
+  if(Math.min(a.y,br.y)>HH+20||Math.max(a.y,bl.y)<-20)return;
+  const trace=()=>{
+    ctx.beginPath();ctx.moveTo(a.x,a.y);
+    for(let i=1;i<pts.length;i++){
+      const p0=pts[i-1],p1=pts[i],mid={x:(p0.x+p1.x)/2,y:(p0.y+p1.y)/2},sm=S(mid),sp=S(p1);
+      if(i===1)ctx.lineTo(sm.x,sm.y);else{const cp=S(p0);ctx.quadraticCurveTo(cp.x,cp.y,sm.x,sm.y)}
+      if(i===pts.length-1)ctx.quadraticCurveTo(sp.x,sp.y,sp.x,sp.y)
+    }
+  };
+  ctx.save();trace();ctx.lineTo(br.x,br.y);ctx.quadraticCurveTo(br.x,br.y+Math.max(1,3*cam.z),br.x-Math.max(1,2*cam.z),br.y);ctx.lineTo(bl.x+Math.max(1,2*cam.z),bl.y);ctx.quadraticCurveTo(bl.x,bl.y+Math.max(1,3*cam.z),bl.x,bl.y);ctx.closePath();ctx.globalAlpha=lava?.92:.72;ctx.fillStyle=lava?'#e94b20':'#168cda';ctx.fill();
+  trace();ctx.globalAlpha=lava?.66:.46;ctx.strokeStyle=lava?'#ffd45c':'#b9edff';ctx.lineWidth=Math.max(1,1.25*cam.z);ctx.stroke();ctx.restore()
+}
+function liquidFallingColumnsV21(now,left,right){
+  const cols=new Map();
+  for(const r of liquidCellsV18.values()){
+    if(r.a<=.003||ctr(r.x)<left||ctr(r.x)>right||!liquidFallingV21(r,now))continue;
+    const k=r.kind+':'+r.x;if(!cols.has(k))cols.set(k,[]);cols.get(k).push(r)
+  }
+  const chains=[];
+  for(const arr of cols.values()){
+    arr.sort((a,b)=>a.y-b.y);let run=[];
+    for(const r of arr){if(run.length&&r.y!==run[run.length-1].y+1){chains.push(run);run=[]}run.push(r)}if(run.length)chains.push(run)
+  }
+  return chains
+}
+function liquidRibbonXWorldV21(chain,now,t){
+  const first=chain[0],kind=first.kind;
+  let side=0,weight=0;
+  for(const r of chain){const m=liquidMotionV20At(r.x,r.y,kind,now);if(m?.side){side+=(r.x-(m.fromX??r.x))*m.side;weight+=m.side}}
+  const drift=weight?clamp(side/weight,-1,1)*B*.16:0;
+  const wave=(kind==='lava'?.018:.032)*B*Math.sin(now*(kind==='lava'?.00115:.0018)+first.x*.73+first.y*.31+liquidRibbonPhaseV21+t*2.2);
+  return ctr(first.x)+drift*t+wave*Math.sin(Math.PI*t)
+}
+function liquidDrawRibbonV21(chain,now){
+  if(!chain.length)return;const first=chain[0],last=chain[chain.length-1],kind=first.kind,lava=kind==='lava';
+  const above=liquidRecV18(first.x,first.y-1),below=liquidRecV18(last.x,last.y+1);
+  let startY=first.y*B+B*.08,endY=(last.y+1)*B-B*.04;
+  if(above&&above.kind===kind&&liquidSupportedPoolV20(above))startY=liquidSurfaceHeightV20(above,now)+B*.035;
+  if(below&&below.kind===kind&&liquidSupportedPoolV20(below))endY=liquidSurfaceHeightV20(below,now)-B*.02;
+  if(endY<=startY+B*.06)return;
+  let strength=0;
+  for(const r of chain){const m=liquidMotionV20At(r.x,r.y,kind,now);strength+=Math.max(r.a*.48,m?.down||0)}strength=clamp(strength/chain.length,0,1);
+  const x0=liquidRibbonXWorldV21(chain,now,0),x1=liquidRibbonXWorldV21(chain,now,.48),x2=liquidRibbonXWorldV21(chain,now,1);
+  const p0=w2s(x0,startY),p1=w2s(x1,(startY+endY)*.48),p2=w2s(x2,endY),sz=B*cam.z;
+  if(Math.min(p0.y,p2.y)>HH+30||Math.max(p0.y,p2.y)<-30)return;
+  const width=Math.max(2,sz*(lava?.095:.075)*(1+strength*(lava?.72:1.10)));
+  ctx.save();ctx.lineCap='round';ctx.lineJoin='round';ctx.globalAlpha=lava?.88:.70;ctx.strokeStyle=lava?'#e94b20':'#168cda';ctx.lineWidth=width;
+  ctx.beginPath();ctx.moveTo(p0.x,p0.y);ctx.quadraticCurveTo(p1.x,p1.y,p2.x,p2.y);ctx.stroke();
+  ctx.globalAlpha=lava?.48:.20;ctx.strokeStyle=lava?'#ffd45c':'#d8f5ff';ctx.lineWidth=Math.max(1,width*.18);ctx.beginPath();ctx.moveTo(p0.x-width*.10,p0.y+1);ctx.quadraticCurveTo(p1.x-width*.08,p1.y,p2.x-width*.06,p2.y-1);ctx.stroke();
+  if(below&&below.kind===kind&&liquidSupportedPoolV20(below)){
+    ctx.globalAlpha=lava?.30:.16;ctx.strokeStyle=lava?'#ffb246':'#9fe4ff';ctx.lineWidth=Math.max(1,width*.14);ctx.beginPath();ctx.ellipse(p2.x,p2.y,Math.max(2,width*.85),Math.max(1,width*.20),0,0,Math.PI*2);ctx.stroke()
+  }
+  ctx.restore()
+}
+function liquidDrawMotionStreamsV20(now,left,right){
+  liquidV21Init();for(const chain of liquidFallingColumnsV21(now,left,right))liquidDrawRibbonV21(chain,now)
+}
+function drawSpillStreamsV19(now){
+  // v21 absorbs edge waterfalls into the same ribbon renderer to avoid double lines
+  // and the tiny vertical 'antenna' that could appear at a pool surface.
+}
+function drawMappedLiquids(now){
+  liquidV21Init();const left=cam.x-W/(2*cam.z)-B*2,right=cam.x+W/(2*cam.z)+B*2;
+  liquidDrawBodyBandsV21(now,left,right);liquidDrawSurfacesV20(now,left,right);liquidDrawMotionStreamsV20(now,left,right)
+}
+window.__skyStackLiquidDebug=()=>{
+  liquidV21Init();let water=0,lava=0,volume=0,moving=0,now=performance.now();
+  for(const r of liquidCellsV18.values()){if(r.kind==='water')water++;else lava++;volume+=r.a;if(liquidFallingV21(r,now))moving++}
+  return{build:'v21',cells:liquidCellsV18.size,water,lava,volume:+volume.toFixed(2),falling:moving}
+};
