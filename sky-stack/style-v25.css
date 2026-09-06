@@ -1,0 +1,4 @@
+#gridToggle{position:absolute;right:10px;top:max(108px,calc(env(safe-area-inset-top) + 108px));min-width:84px;height:31px;padding:0 8px;background:#dff1ff;font-size:9px;z-index:7}
+#gridToggle.gridOff{background:#e8e0ca;opacity:.88}
+#tipBtn{top:max(147px,calc(env(safe-area-inset-top) + 147px))}
+#tips{top:max(182px,calc(env(safe-area-inset-top) + 182px))}
