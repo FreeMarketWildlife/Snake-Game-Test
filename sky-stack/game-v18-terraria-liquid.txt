@@ -1,0 +1,197 @@
+
+// --- v18 TERRARIA-STYLE LIQUID VOLUME SYSTEM ------------------------------------
+// Liquids use conserved fractional cell volumes for pooling/spilling, while rendering
+// is continuous and surface-based rather than exposing the underlying simulation cells.
+var liquidCellsV18,liquidSeededV18,liquidTickV18,liquidLastReactV18;
+SKY_BUILD='v18';
+function liquidGridInitV18(){
+  liquidInit();
+  if(!liquidCellsV18)liquidCellsV18=new Map();
+  if(!liquidSeededV18)liquidSeededV18=new Set();
+  if(!Number.isFinite(liquidTickV18))liquidTickV18=0;
+  if(!Number.isFinite(liquidLastReactV18))liquidLastReactV18=0
+}
+function liquidRecV18(cx,cy){liquidGridInitV18();return liquidCellsV18.get(key(cx,cy))||null}
+function liquidPutV18(cx,cy,kind,amount){
+  liquidGridInitV18();amount=finite(amount);if(amount<=.0005)return 0;
+  const k=key(cx,cy),old=liquidCellsV18.get(k);
+  if(old&&old.kind!==kind)return 0;
+  const before=old?old.a:0,after=Math.min(1,before+amount);
+  if(old)old.a=after;else liquidCellsV18.set(k,{x:cx,y:cy,kind,a:after});
+  return after-before
+}
+function liquidAddWorldV18(kind,x,y,amount){
+  liquidGridInitV18();
+  let cx=cell(x),cy=cell(y),left=Math.max(0,finite(amount));
+  // If the target cell is full, stack excess upward like a poured column.
+  for(let i=0;i<18&&left>.001;i++){
+    if(!liquidOpenV18(cx,cy-i))continue;
+    const got=liquidPutV18(cx,cy-i,kind,left);left-=got
+  }
+  return amount-left
+}
+function liquidOpenV18(cx,cy){
+  liquidGridInitV18();
+  if(cy>=DEPTH)return false;
+  if(cy<-64)return false;
+  const ch=Math.floor(cx/24);if(!generated.has(ch))return false;
+  if(grid.has(key(cx,cy)))return false;
+  return true
+}
+function liquidDeleteTinyV18(){
+  for(const [k,r] of liquidCellsV18)if(r.a<.002||!Number.isFinite(r.a))liquidCellsV18.delete(k)
+}
+function liquidMoveV18(src,tx,ty,want){
+  if(!src||src.a<=.001||want<=.001||!liquidOpenV18(tx,ty))return 0;
+  const dst=liquidRecV18(tx,ty);if(dst&&dst.kind!==src.kind)return 0;
+  const cap=1-(dst?dst.a:0),m=Math.min(src.a,want,cap);if(m<=.001)return 0;
+  src.a-=m;liquidPutV18(tx,ty,src.kind,m);return m
+}
+function liquidStepKindV18(kind){
+  liquidGridInitV18();
+  const centerCh=Math.floor(cam.x/(24*B)),range=3;
+  const arr=[];
+  for(const r of liquidCellsV18){const q=r[1];if(q.kind!==kind)continue;const ch=Math.floor(q.x/24);if(Math.abs(ch-centerCh)<=range)arr.push(q)}
+  // Lower cells move first so lower capacity clears before upper liquid is processed.
+  const flip=(liquidTickV18&1)?1:-1;
+  arr.sort((a,b)=>b.y-a.y||flip*(a.x-b.x));
+  const downRate=kind==='lava'?.30:.92,sideRate=kind==='lava'?.075:.32;
+  for(const src of arr){
+    if(src.a<=.002)continue;
+    // Gravity gets first claim on volume.
+    liquidMoveV18(src,src.x,src.y+1,downRate);
+    if(src.a<=.01)continue;
+    // If we cannot continue downward, equalize with neighboring cells. Alternating
+    // direction removes the usual left/right bias of a grid solver.
+    const dirs=flip>0?[1,-1]:[-1,1];
+    for(const dx of dirs){
+      if(src.a<=.01)break;
+      const nx=src.x+dx,ny=src.y;if(!liquidOpenV18(nx,ny))continue;
+      const n=liquidRecV18(nx,ny);if(n&&n.kind!==kind)continue;
+      const na=n?n.a:0,diff=src.a-na;
+      if(diff>.025)liquidMoveV18(src,nx,ny,Math.min(sideRate,diff*.48))
+    }
+  }
+  liquidDeleteTinyV18()
+}
+function liquidReactV18(now){
+  liquidGridInitV18();if(now-liquidLastReactV18<115)return;liquidLastReactV18=now;
+  let made=0;
+  for(const w of [...liquidCellsV18.values()]){
+    if(w.kind!=='water'||w.a<.12)continue;
+    for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){
+      const l=liquidRecV18(w.x+dx,w.y+dy);if(!l||l.kind!=='lava'||l.a<.12)continue;
+      const consume=Math.min(.5,w.a,l.a);w.a-=consume;l.a-=consume;
+      const ox=ctr(l.x),oy=ctr(l.y);createObsidian(ox,oy,{angle:(hash01(l.x,l.y,1801)-.5)*.04});
+      if(window.SkyAudio?.sizzle)SkyAudio.sizzle();made++;break
+    }
+    if(made>=4)break
+  }
+  if(made){liquidDeleteTinyV18();wake();saveSoon()}
+}
+function updateBuoyancyV18(){
+  liquidGridInitV18();
+  for(const z of bs){
+    if(!z.game?.placed||z.isStatic)continue;
+    const cx=cell(z.position.x),cy=cell(z.position.y);let wet=0,samples=0;
+    for(let yy=cy-1;yy<=cy+1;yy++)for(let xx=cx-1;xx<=cx+1;xx++){
+      samples++;const r=liquidRecV18(xx,yy);if(r&&r.kind==='water')wet+=r.a
+    }
+    const coverage=clamp(wet/Math.max(1,samples*.42),0,1);
+    if(coverage<=.02){wetBodies.delete(z);continue}
+    if(z.game.material==='dirt'){
+      Body.applyForce(z,z.position,{x:0,y:-z.mass*.00175*(.5+coverage)});
+      Body.setVelocity(z,{x:z.velocity.x*.992,y:z.velocity.y*.978});Body.setAngularVelocity(z,z.angularVelocity*.988)
+    }else if(z.game.material==='stone'||z.game.material==='deepslate'||z.game.material==='obsidian'){
+      Body.applyForce(z,z.position,{x:0,y:z.mass*.0002*(.3+coverage)})
+    }
+    if(!wetBodies.has(z)){wetBodies.add(z);if(window.SkyAudio?.splash)SkyAudio.splash('water')}
+  }
+}
+function updateLiquids(now){
+  liquidGridInitV18();liquidTickV18++;
+  // Water updates at 20 Hz; lava at 10 Hz. Two water passes help long drops remain
+  // responsive without scaling the physics engine body count.
+  if(liquidTickV18%3===0){liquidStepKindV18('water');liquidStepKindV18('water');updateBuoyancyV18()}
+  if(liquidTickV18%6===0)liquidStepKindV18('lava');
+  liquidReactV18(now)
+}
+
+// Generation creates conserved volume, not rigid circles.
+function seedPocket(d){
+  liquidGridInitV18();if(!d||liquidSeededV18.has(d.id))return;
+  liquidSeededV18.add(d.id);fluidSeeded.add(d.id);
+  const fill=d.surface?.84:(d.kind==='lava'?.91:.93);
+  for(const p of d.cells)liquidPutV18(p[0],p[1],d.kind,fill)
+}
+function createFluid(kind,x,y,o={}){liquidGridInitV18();liquidAddWorldV18(kind,x,y,o.amount||.22);return null}
+function removeFluid(q){}
+function wakeFluids(){}
+function manageFluidActivity(){}
+function fluidNeighborForces(){}
+function activeFluids(){return[]}
+
+function drawMappedLiquids(now){
+  liquidGridInitV18();
+  const left=cam.x-W/(2*cam.z)-B,right=cam.x+W/(2*cam.z)+B;
+  for(const r of liquidCellsV18.values()){
+    if(r.a<=.004)continue;const wx=ctr(r.x);if(wx<left||wx>right)continue;
+    const s=w2s(wx,ctr(r.y)),sz=B*cam.z,bottom=s.y+sz/2,h=Math.max(1,sz*clamp(r.a,0,1));
+    if(bottom<0||bottom-h>HH)continue;
+    const top=bottom-h,lava=r.kind==='lava';
+    ctx.save();
+    // Slight overlap removes cell seams so full neighboring cells read as one body.
+    ctx.globalAlpha=lava?.92:.72;ctx.fillStyle=lava?'#e94b20':'#168cda';
+    ctx.fillRect(s.x-sz/2-.6,top,sz+1.2,h+.8);
+    if(lava){
+      ctx.globalAlpha=.52;ctx.fillStyle='#ff8a2e';ctx.fillRect(s.x-sz/2,Math.max(top,bottom-h*.62),sz,h*.24);
+      const pulse=(Math.sin(now/180+r.x*.61+r.y*.33)+1)*.5;
+      ctx.globalAlpha=.35+pulse*.2;ctx.fillStyle='#ffd158';ctx.fillRect(s.x-sz*.25,bottom-h*.48,sz*.5,Math.max(1,sz*.08))
+    }else{
+      ctx.globalAlpha=.18;ctx.fillStyle='#d8f5ff';ctx.fillRect(s.x-sz/2,Math.max(top,bottom-h*.72),sz,h*.18)
+    }
+    // Only exposed liquid surfaces get a moving highlight. The wave is based on world
+    // coordinates so adjacent cells visually connect instead of looking like tiles.
+    const above=liquidRecV18(r.x,r.y-1),covered=above&&above.kind===r.kind&&above.a>.06;
+    if(!covered){
+      const amp=Math.min(2.8,1.7*cam.z),ph=now*(lava?.0017:.0028)+r.x*.63;
+      const yL=top+Math.sin(ph)*amp,yM=top+Math.sin(ph+.55)*amp,yR=top+Math.sin(ph+1.1)*amp;
+      ctx.globalAlpha=lava?.82:.72;ctx.strokeStyle=lava?'#ffd45c':'#b9edff';ctx.lineWidth=Math.max(1,1.6*cam.z);
+      ctx.beginPath();ctx.moveTo(s.x-sz/2-.5,yL);ctx.quadraticCurveTo(s.x,yM,s.x+sz/2+.5,yR);ctx.stroke()
+    }
+    ctx.restore()
+  }
+}
+
+// Persist exact liquid volume in the normal world save while suppressing the old
+// particle array. Existing v17 particle saves are migrated once into conserved volume.
+var v18BaseSaveGame=saveGame;
+saveGame=function(){
+  v18BaseSaveGame();liquidGridInitV18();
+  try{
+    const raw=localStorage.getItem(SAVE_KEY);if(!raw)return;const s=JSON.parse(raw);
+    s.liquidCellsV18=[...liquidCellsV18.values()].filter(r=>r.a>.003).map(r=>[r.x,r.y,r.kind,Math.round(r.a*10000)/10000]);
+    s.liquidSeededV18=[...liquidSeededV18];s.fluids=[];localStorage.setItem(SAVE_KEY,JSON.stringify(s))
+  }catch(e){console.warn('Liquid volume save failed',e)}
+};
+var v18BaseRestoreDynamicState=restoreDynamicState;
+restoreDynamicState=function(s){
+  liquidGridInitV18();
+  if(s&&Array.isArray(s.liquidCellsV18)){
+    liquidCellsV18.clear();liquidSeededV18.clear();
+    for(const row of s.liquidCellsV18){if(!Array.isArray(row)||row.length<4)continue;const x=Math.floor(finite(row[0])),y=Math.floor(finite(row[1])),kind=row[2],a=clamp(finite(row[3]),0,1);if((kind==='water'||kind==='lava')&&a>.002)liquidCellsV18.set(key(x,y),{x,y,kind,a})}
+    if(Array.isArray(s.liquidSeededV18))for(const id of s.liquidSeededV18)if(typeof id==='string')liquidSeededV18.add(id)
+  }else if(s){
+    // v17 migration: four old particles roughly represented one full tile of volume.
+    liquidCellsV18.clear();liquidSeededV18.clear();
+    if(Array.isArray(s.fluidSeeded))for(const id of s.fluidSeeded)if(typeof id==='string')liquidSeededV18.add(id);
+    if(Array.isArray(s.fluids))for(const f of s.fluids)if(f&&(f.kind==='water'||f.kind==='lava')){const x=cell(finite(f.x)),y=cell(finite(f.y));liquidPutV18(x,y,f.kind,.22)};
+    if(!liquidCellsV18.size)for(const ch of generated)for(const d of pocketDefs(ch)){liquidSeededV18.delete(d.id);seedPocket(d)}
+  }
+  const copy=s?{...s,fluids:[]}:s;v18BaseRestoreDynamicState(copy)
+};
+
+window.__skyStackLiquidDebug=()=>{
+  liquidGridInitV18();let water=0,lava=0,volume=0;for(const r of liquidCellsV18.values()){if(r.kind==='water')water++;else lava++;volume+=r.a}
+  return{build:'v18',cells:liquidCellsV18.size,water,lava,volume:+volume.toFixed(2),seeded:liquidSeededV18.size}
+};
