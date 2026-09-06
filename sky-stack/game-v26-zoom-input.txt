@@ -1,0 +1,116 @@
+// --- v26 SAFE PINCH ZOOM / NATIVE-ZOOM GUARD ------------------------------------
+// Prevent browser page zoom from stealing mining gestures. Two-finger input on the
+// canvas becomes controlled in-game zoom, centered on the midpoint between fingers.
+var pinchTouchesV26=new Map(),pinchConsumedV26=new Set(),pinchStateV26=null;
+var zoomReturnActiveV26=false,zoomTargetV26=1,lastCanvasTouchEndV26=0;
+const MIN_ZOOM_V26=.72,MAX_ZOOM_V26=1.55,DEFAULT_ZOOM_V26=1;
+SKY_BUILD='v26';
+
+function pinchPosV26(e){
+  const r=c.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top}
+}
+function pinchPairV26(){
+  const a=[...pinchTouchesV26.entries()];
+  if(a.length<2)return null;
+  return{a:a[0],b:a[1]}
+}
+function pinchMetricsV26(pair){
+  const p=pair.a[1],q=pair.b[1];
+  return{mx:(p.x+q.x)/2,my:(p.y+q.y)/2,dist:Math.max(8,Math.hypot(q.x-p.x,q.y-p.y))}
+}
+function pinchBeginV26(){
+  const pair=pinchPairV26();if(!pair)return;
+  const m=pinchMetricsV26(pair);
+  pinchStateV26={
+    ids:[pair.a[0],pair.b[0]],startDist:m.dist,startZoom:cam.z,
+    anchor:s2w(m.mx,m.my)
+  };
+  pinchConsumedV26.add(pair.a[0]);pinchConsumedV26.add(pair.b[0]);
+  gesture=null;pointers.clear();cam.anim=false;zoomReturnActiveV26=false;
+  if(typeof cameraSpringActiveV24!=='undefined')cameraSpringActiveV24=false;
+  if(typeof cameraSpringVYV24!=='undefined')cameraSpringVYV24=0;
+}
+function pinchApplyV26(){
+  if(!pinchStateV26)return;
+  const pair=pinchPairV26();if(!pair)return;
+  const m=pinchMetricsV26(pair),ratio=m.dist/pinchStateV26.startDist;
+  const nz=clamp(pinchStateV26.startZoom*ratio,MIN_ZOOM_V26,MAX_ZOOM_V26);
+  const rawX=pinchStateV26.anchor.x-(m.mx-W/2)/nz;
+  const rawY=pinchStateV26.anchor.y-(m.my-HH/2)/nz;
+  cam.z=nz;cam.x=rawX;
+  cam.y=(typeof cameraRubberFromRawV24==='function')?cameraRubberFromRawV24(rawY):rawY;
+  if(typeof cameraDragRawYV24!=='undefined')cameraDragRawYV24=cam.y;
+  if(typeof cameraDragVelocityV24!=='undefined')cameraDragVelocityV24=0;
+}
+function pinchEndV26(){
+  if(!pinchStateV26)return;
+  pinchStateV26=null;pointers.clear();gesture=null;
+  if(typeof cameraDragVelocityV24!=='undefined')cameraDragVelocityV24=0;
+  if(typeof cameraDragRawYV24!=='undefined')cameraDragRawYV24=cam.y;
+  if(typeof cameraReleaseV24==='function')cameraReleaseV24()
+}
+
+// Capture-phase handlers get first chance at a second finger, before the original
+// single-pointer mining/build handlers can turn it into an accidental action.
+c.addEventListener('pointerdown',e=>{
+  if(e.pointerType!=='touch')return;
+  pinchTouchesV26.set(e.pointerId,pinchPosV26(e));
+  try{c.setPointerCapture(e.pointerId)}catch{}
+  if(pinchTouchesV26.size>=2){
+    if(!pinchStateV26)pinchBeginV26();
+    e.preventDefault();e.stopImmediatePropagation()
+  }
+},{capture:true,passive:false});
+
+c.addEventListener('pointermove',e=>{
+  if(e.pointerType!=='touch')return;
+  if(pinchTouchesV26.has(e.pointerId))pinchTouchesV26.set(e.pointerId,pinchPosV26(e));
+  if(pinchStateV26||pinchConsumedV26.has(e.pointerId)){
+    pinchApplyV26();e.preventDefault();e.stopImmediatePropagation()
+  }
+},{capture:true,passive:false});
+
+function pinchPointerEndV26(e){
+  if(e.pointerType!=='touch')return;
+  const consumed=pinchConsumedV26.has(e.pointerId)||!!pinchStateV26;
+  pinchTouchesV26.delete(e.pointerId);pinchConsumedV26.delete(e.pointerId);
+  if(pinchStateV26&&pinchTouchesV26.size<2)pinchEndV26();
+  if(consumed){e.preventDefault();e.stopImmediatePropagation()}
+}
+c.addEventListener('pointerup',pinchPointerEndV26,{capture:true,passive:false});
+c.addEventListener('pointercancel',pinchPointerEndV26,{capture:true,passive:false});
+
+// Safari/WebKit native page-zoom guards. The game handles pinch itself above.
+const blockNativeZoomV26=e=>{if(e.cancelable)e.preventDefault()};
+for(const name of ['gesturestart','gesturechange','gestureend'])document.addEventListener(name,blockNativeZoomV26,{capture:true,passive:false});
+c.addEventListener('touchmove',e=>{if(e.touches&&e.touches.length>1&&e.cancelable)e.preventDefault()},{capture:true,passive:false});
+c.addEventListener('touchend',e=>{
+  const now=performance.now();
+  if(now-lastCanvasTouchEndV26<330&&e.cancelable)e.preventDefault();
+  lastCanvasTouchEndV26=now
+},{capture:true,passive:false});
+c.addEventListener('dblclick',e=>{e.preventDefault();e.stopPropagation()},{capture:true,passive:false});
+
+// TOP and DOWN reuse the existing camera targets, but always return to normal zoom.
+const goBaseV26=go;
+go=function(p){
+  zoomTargetV26=DEFAULT_ZOOM_V26;zoomReturnActiveV26=true;
+  pinchStateV26=null;pinchTouchesV26.clear();pinchConsumedV26.clear();
+  goBaseV26(p)
+};
+
+// v24 owns x/y spring physics. Wrap its tick only to animate zoom back to 1x when a
+// camera navigation button is used.
+const cameraTickBaseV26=cameraTickV24;
+cameraTickV24=function(now){
+  if(zoomReturnActiveV26&&!pinchStateV26){
+    cam.z+=(zoomTargetV26-cam.z)*.16;
+    if(Math.abs(zoomTargetV26-cam.z)<.0025){cam.z=zoomTargetV26;zoomReturnActiveV26=false}
+  }
+  cameraTickBaseV26(now)
+};
+
+window.__skyStackZoomDebug=()=>({
+  build:'v26',zoom:+cam.z.toFixed(3),min:MIN_ZOOM_V26,max:MAX_ZOOM_V26,
+  pinching:!!pinchStateV26,touches:pinchTouchesV26.size
+});
