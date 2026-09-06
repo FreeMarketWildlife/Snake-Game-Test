@@ -1,0 +1,209 @@
+
+// --- v17 LIQUID TUNING -------------------------------------------------------------
+// Half-frequency world generation, smoother particle-fluid behavior, and bounded
+// active simulation so liquids stay playful without scaling badly on mobile.
+
+SKY_BUILD='v17';
+const oldBuildBadge=document.getElementById('skyBuildBadge');if(oldBuildBadge)oldBuildBadge.remove();
+
+function pocketDefs(ch){
+  liquidInit();
+  if(pocketCache.has(ch))return pocketCache.get(ch);
+  const base=ch*24,defs=[];
+  const had=id=>fluidSeeded.has(id)||revealedPockets.has(id);
+
+  // v14 was 82%; v17 is ~41%. Preserve already-generated pockets in existing saves.
+  const surfaceId='water:surface:v14:'+ch;
+  if(had(surfaceId)||hash01(ch,0,701)<.41){
+    let width,left,cells=[];
+    if(ch===-1&&had(surfaceId)){
+      width=4;left=base+20;
+    }else if(ch===0&&had(surfaceId)){
+      width=4;left=base;
+    }else{
+      width=4+Math.floor(hash01(ch,0,702)*4);
+      left=base+3+Math.floor(hash01(ch,0,703)*Math.max(1,18-width));
+    }
+    for(let x=left;x<left+width;x++){
+      cells.push([x,0]);
+      if(x>left&&x<left+width-1)cells.push([x,1]);
+    }
+    defs.push({id:surfaceId,kind:'water',surface:true,cells});
+  }
+
+  // v14 was guaranteed; now 50%. Existing explored worlds keep their old cavities.
+  const stoneAId='water:stoneA:v14:'+ch;
+  if(had(stoneAId)||hash01(ch,1,711)<.50){
+    const cx=base+4+Math.floor(hash01(ch,1,711)*16),cy=10+Math.floor(hash01(ch,1,712)*12);
+    const rx=2+Math.floor(hash01(ch,1,713)*2),ry=1+Math.floor(hash01(ch,1,714)*2);
+    defs.push({id:stoneAId,kind:'water',surface:false,cells:ellipseCells(cx,cy,rx,ry)});
+  }
+  const stoneBId='water:stoneB:v14:'+ch;
+  if(had(stoneBId)||hash01(ch,3,715)<.29){
+    const cx=base+5+Math.floor(hash01(ch,3,716)*14),cy=12+Math.floor(hash01(ch,3,717)*10);
+    defs.push({id:stoneBId,kind:'water',surface:false,cells:ellipseCells(cx,cy,2,1)});
+  }
+
+  // v14 was 90% / 45%; now 45% / 22.5%.
+  const lavaAId='lava:deepA:v14:'+ch;
+  if(had(lavaAId)||hash01(ch,2,721)<.45){
+    const cx=base+4+Math.floor(hash01(ch,2,722)*16),cy=34+Math.floor(hash01(ch,2,723)*13);
+    const rx=2+Math.floor(hash01(ch,2,724)*2),ry=1+Math.floor(hash01(ch,2,725)*2);
+    defs.push({id:lavaAId,kind:'lava',surface:false,cells:ellipseCells(cx,cy,rx,ry)});
+  }
+  const lavaBId='lava:deepB:v14:'+ch;
+  if(had(lavaBId)||hash01(ch,4,726)<.225){
+    const cx=base+5+Math.floor(hash01(ch,4,727)*14),cy=38+Math.floor(hash01(ch,4,728)*10);
+    defs.push({id:lavaBId,kind:'lava',surface:false,cells:ellipseCells(cx,cy,2,1)});
+  }
+
+  pocketCache.set(ch,defs);return defs
+}
+
+// No fake full-block reservoir bodies. The particles themselves are the liquid.
+function makeReservoirVisual(d){}
+function removeReservoirVisual(d){}
+
+function createFluid(kind,x,y,o={}){
+  liquidInit();if(!Number.isFinite(fluidId))fluidId=0;
+  const lava=kind==='lava',radius=lava?4.9:4.55;
+  const q=Bodies.circle(x,y,radius,{
+    density:lava?.00038:.00013,
+    friction:lava?.014:.0015,
+    frictionStatic:0,
+    restitution:lava?.004:.012,
+    frictionAir:lava?.026:.006,
+    slop:.015,
+    sleepThreshold:lava?72:48,
+    collisionFilter:{group:-7}
+  });
+  q.game={kind:'liquid',liquid:kind,material:kind,id:++fluidId,born:performance.now(),w:radius*2,h:radius*2,max:Infinity,hits:0,cost:0,terrain:false,placed:false,parked:false};
+  if(o.velocity)Body.setVelocity(q,{x:finite(o.velocity.x),y:finite(o.velocity.y)});
+  fluids.add(q);World.add(eng.world,q);return q
+}
+function removeFluid(q){if(!q||!fluids.has(q))return;fluids.delete(q);if(!q.game?.parked)World.remove(eng.world,q)}
+
+function seedPocket(d){
+  liquidInit();if(!d||fluidSeeded.has(d.id))return;
+  fluidSeeded.add(d.id);
+  const offsets=[[-6,-6],[6,-6],[-6,6],[6,6]];
+  for(const [cx,cy] of d.cells)for(const [ox,oy] of offsets){
+    const jitterX=(hash01(cx*7+ox,cy,741)-.5)*1.4,jitterY=(hash01(cx,cy*7+oy,742)-.5)*1.4;
+    createFluid(d.kind,ctr(cx)+ox+jitterX,ctr(cy)+oy+jitterY)
+  }
+}
+function seedVisiblePockets(ch){for(const d of pocketDefs(ch))seedPocket(d)}
+
+function manageFluidActivity(){
+  liquidInit();
+  const activeRange=24*B*2.8,returnRange=24*B*2.45;
+  for(const q of fluids){
+    const dx=Math.abs(q.position.x-cam.x),parked=!!q.game.parked;
+    if(!parked&&dx>activeRange){
+      World.remove(eng.world,q);q.game.parked=true
+    }else if(parked&&dx<returnRange){
+      World.add(eng.world,q);q.game.parked=false;Sleeping.set(q,false)
+    }
+  }
+}
+
+function activeFluids(){const out=[];for(const q of fluids)if(!q.game?.parked)out.push(q);return out}
+
+function fluidNeighborForces(){
+  const live=activeFluids().filter(q=>!q.isSleeping);
+  if(live.length<2)return;
+  const cellSize=18,buckets=new Map();
+  for(const q of live){
+    const bx=Math.floor(q.position.x/cellSize),by=Math.floor(q.position.y/cellSize),k=bx+','+by;
+    if(!buckets.has(k))buckets.set(k,[]);buckets.get(k).push(q)
+  }
+  let pairs=0;const PAIR_BUDGET=2400;
+  for(const a of live){
+    const ax=Math.floor(a.position.x/cellSize),ay=Math.floor(a.position.y/cellSize);
+    for(let oy=-1;oy<=1;oy++)for(let ox=-1;ox<=1;ox++){
+      const arr=buckets.get((ax+ox)+','+(ay+oy));if(!arr)continue;
+      for(const b of arr){
+        if(b.id<=a.id)continue;if(++pairs>PAIR_BUDGET)return;
+        const dx=b.position.x-a.position.x,dy=b.position.y-a.position.y,d2=dx*dx+dy*dy;
+        if(d2<.01||d2>18*18)continue;
+        const d=Math.sqrt(d2),nx=dx/d,ny=dy/d,same=a.game.liquid===b.game.liquid;
+        const lava=same&&a.game.liquid==='lava',target=lava?10.5:9.7,range=lava?17.5:16.5;
+        const mass=Math.min(a.mass,b.mass);
+        let f=0;
+        if(d<target){
+          f=(1-d/target)*mass*(lava?.00145:.00115);
+          Body.applyForce(a,a.position,{x:-nx*f,y:-ny*f});Body.applyForce(b,b.position,{x:nx*f,y:ny*f})
+        }else if(same&&d<range){
+          f=((d-target)/(range-target))*mass*(lava?.00013:.000075);
+          Body.applyForce(a,a.position,{x:nx*f,y:ny*f});Body.applyForce(b,b.position,{x:-nx*f,y:-ny*f})
+        }
+      }
+    }
+  }
+}
+
+function liquidBuckets(){
+  const map=new Map();for(const q of fluids){if(q.game?.parked)continue;const k=key(cell(q.position.x),cell(q.position.y));if(!map.has(k))map.set(k,[]);map.get(k).push(q)}return map
+}
+function reactLiquids(now){
+  if(now-lastLiquidReaction<105)return;lastLiquidReaction=now;
+  const buckets=liquidBuckets(),used=new Set();let made=0;
+  for(const w of fluids){
+    if(w.game?.parked||w.game.liquid!=='water'||used.has(w))continue;
+    const cx=cell(w.position.x),cy=cell(w.position.y);let hit=null;
+    for(let dy=-1;dy<=1&&!hit;dy++)for(let dx=-1;dx<=1&&!hit;dx++)for(const q of buckets.get(key(cx+dx,cy+dy))||[]){
+      if(q.game.liquid==='lava'&&!used.has(q)&&Math.hypot(q.position.x-w.position.x,q.position.y-w.position.y)<11.5){hit=q;break}
+    }
+    if(hit){
+      used.add(w);used.add(hit);const x=(w.position.x+hit.position.x)/2,y=(w.position.y+hit.position.y)/2;
+      removeFluid(w);removeFluid(hit);createObsidian(x,y,{angle:(hash01(cell(x),cell(y),501)-.5)*.08});made++;
+      if(window.SkyAudio?.sizzle)SkyAudio.sizzle();if(made>=5)break
+    }
+  }
+  if(made){wake();saveSoon()}
+}
+
+function updateBuoyancy(){
+  const all=activeFluids();if(!all.length)return;
+  for(const z of bs){
+    if(!z.game?.placed||z.isStatic)continue;
+    const touching=Query.region(all,z.bounds).filter(q=>q.game?.liquid==='water');
+    if(!touching.length){wetBodies.delete(z);continue}
+    const cells=Math.max(1,(z.game.w*z.game.h)/(B*B)),coverage=clamp(touching.length/(cells*3),0,1);
+    if(z.game.material==='dirt'){
+      Body.applyForce(z,z.position,{x:0,y:-z.mass*.0015*(.58+coverage)});
+      Body.setVelocity(z,{x:z.velocity.x*.991,y:z.velocity.y*.977});Body.setAngularVelocity(z,z.angularVelocity*.987)
+    }else if(z.game.material==='stone'||z.game.material==='deepslate'||z.game.material==='obsidian'){
+      Body.applyForce(z,z.position,{x:0,y:z.mass*.00022*(.35+coverage)})
+    }
+    if(!wetBodies.has(z)){wetBodies.add(z);if(window.SkyAudio?.splash)SkyAudio.splash('water')}
+  }
+}
+
+function updateLiquids(now){
+  liquidInit();reactLiquids(now);
+  liquidFrame++;
+  if(liquidFrame%3===0){fluidNeighborForces();updateBuoyancy()}
+  if(liquidFrame%20===0)manageFluidActivity()
+}
+
+function drawMappedLiquids(now){
+  liquidInit();
+  for(const q of fluids){
+    if(q.game?.parked)continue;
+    const s=w2s(q.position.x,q.position.y);if(s.x<-20||s.x>W+20||s.y<-20||s.y>HH+20)continue;
+    const lava=q.game.liquid==='lava',speed=Math.hypot(q.velocity.x,q.velocity.y),ang=speed>.08?Math.atan2(q.velocity.y,q.velocity.x):0;
+    const base=(lava?8.5:8.2)*cam.z,stretch=clamp(speed*.035,0,.42),rx=base*(1+stretch),ry=base*(1-stretch*.35);
+    ctx.save();ctx.translate(s.x,s.y);ctx.rotate(ang);
+    if(lava){
+      const pulse=(Math.sin(now/145+q.game.id*.61)+1)*.5;
+      ctx.globalAlpha=.22;ctx.fillStyle='#ff6c27';ctx.beginPath();ctx.ellipse(0,0,rx*1.22,ry*1.22,0,0,Math.PI*2);ctx.fill();
+      ctx.globalAlpha=.92;ctx.fillStyle=pulse>.5?'#f66a27':'#e94b20';ctx.beginPath();ctx.ellipse(0,0,rx,ry,0,0,Math.PI*2);ctx.fill();
+      ctx.globalAlpha=.82;ctx.fillStyle='#ffd35a';ctx.beginPath();ctx.ellipse(-rx*.18,-ry*.25,rx*.42,ry*.22,0,0,Math.PI*2);ctx.fill()
+    }else{
+      ctx.globalAlpha=.66;ctx.fillStyle='#248fd8';ctx.beginPath();ctx.ellipse(0,0,rx,ry,0,0,Math.PI*2);ctx.fill();
+      ctx.globalAlpha=.38;ctx.fillStyle='#a9e7ff';ctx.beginPath();ctx.ellipse(-rx*.18,-ry*.28,rx*.48,ry*.22,0,0,Math.PI*2);ctx.fill()
+    }
+    ctx.restore()
+  }
+}
