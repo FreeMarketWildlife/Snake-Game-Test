@@ -1,0 +1,322 @@
+
+// --- v22 SUB-CELL FLUX LIQUID ENGINE ---------------------------------------------
+// Research-driven rewrite: terrain stays on the 32px build grid, while liquids use a
+// 2x2 sub-grid (16px cells), simultaneous flux updates, small compressibility, and a
+// renderer that treats pools and falling streams as continuous shapes rather than tiles.
+var liquidSubV22,liquidSubSeededV22,liquidSubFlowV22,liquidSubVisualV22,liquidSubImpactV22,liquidSubTickV22,liquidSubScaleV22;
+SKY_BUILD='v22';
+
+function liquidV22Init(){
+  liquidInit();
+  if(!Number.isFinite(liquidSubScaleV22)||liquidSubScaleV22<2)liquidSubScaleV22=2;
+  if(!liquidSubV22)liquidSubV22=new Map();
+  if(!liquidSubSeededV22)liquidSubSeededV22=new Set();
+  if(!liquidSubFlowV22)liquidSubFlowV22=new Map();
+  if(!liquidSubVisualV22)liquidSubVisualV22=new Map();
+  if(!liquidSubImpactV22)liquidSubImpactV22=new Map();
+  if(!Number.isFinite(liquidSubTickV22))liquidSubTickV22=0
+}
+function liquidSBV22(){return B/liquidSubScaleV22}
+function liquidSubKeyV22(x,y){return x+','+y}
+function liquidSubRecV22(x,y){liquidV22Init();return liquidSubV22.get(liquidSubKeyV22(x,y))||null}
+function liquidSubCtrV22(n){return(n+.5)*liquidSBV22()}
+function liquidSubOpenV22(sx,sy){
+  liquidV22Init();
+  const sc=liquidSubScaleV22,cx=Math.floor(sx/sc),cy=Math.floor(sy/sc);
+  if(cy>=DEPTH||cy<-64)return false;
+  const ch=Math.floor(cx/24);if(!generated.has(ch))return false;
+  return !grid.has(key(cx,cy))
+}
+function liquidSubPutV22(sx,sy,kind,amount){
+  liquidV22Init();amount=finite(amount);if(amount<=.0002)return 0;
+  const k=liquidSubKeyV22(sx,sy),old=liquidSubV22.get(k);if(old&&old.kind!==kind)return 0;
+  const before=old?old.a:0,after=before+amount;
+  if(old)old.a=after;else liquidSubV22.set(k,{x:sx,y:sy,kind,a:after});
+  return amount
+}
+function liquidSeedTileV22(cx,cy,kind,a){
+  liquidV22Init();a=clamp(finite(a),0,1);
+  const sc=liquidSubScaleV22;if(sc!==2)return;
+  const bottom=Math.min(1,a*2),top=Math.max(0,a*2-1),sx=cx*2,sy=cy*2;
+  if(top>.0002){liquidSubPutV22(sx,sy,kind,top);liquidSubPutV22(sx+1,sy,kind,top)}
+  if(bottom>.0002){liquidSubPutV22(sx,sy+1,kind,bottom);liquidSubPutV22(sx+1,sy+1,kind,bottom)}
+}
+function seedPocket(d){
+  liquidV22Init();if(!d||liquidSubSeededV22.has(d.id))return;
+  liquidSubSeededV22.add(d.id);fluidSeeded.add(d.id);
+  const fill=d.surface?.84:(d.kind==='lava'?.91:.93);
+  for(const p of d.cells)liquidSeedTileV22(p[0],p[1],d.kind,fill)
+}
+function createFluid(kind,x,y,o={}){
+  liquidV22Init();const sb=liquidSBV22(),sx=Math.floor(x/sb),sy=Math.floor(y/sb);
+  liquidSubPutV22(sx,sy,kind,Math.max(.03,finite(o.amount||.30)));return null
+}
+function removeFluid(q){}
+function wakeFluids(){}
+function manageFluidActivity(){}
+function fluidNeighborForces(){}
+function activeFluids(){return[]}
+
+function liquidStableBottomV22(total,kind){
+  const max=1,compress=kind==='lava'?.010:.035;
+  if(total<=max)return max;
+  if(total<2*max+compress)return(max*max+total*compress)/(max+compress);
+  return(total+compress)/2
+}
+function liquidSubMassV22(x,y,kind){
+  const r=liquidSubRecV22(x,y);if(!r)return 0;return r.kind===kind?r.a:null
+}
+function liquidSubSupportedV22(x,y,kind){
+  if(!liquidSubOpenV22(x,y+1))return true;
+  const b=liquidSubRecV22(x,y+1);return !!b&&((b.kind===kind&&b.a>.58)||(b.kind!==kind&&b.a>.35))
+}
+function liquidFlowKeyV22(x,y,kind){return kind+':'+x+','+y}
+function liquidMarkFlowV22(src,tx,ty,moved,now){
+  if(moved<=.0003)return;
+  const k=liquidFlowKeyV22(tx,ty,src.kind),old=liquidSubFlowV22.get(k)||{vx:0,vy:0,mag:0,last:now,fromX:src.x,fromY:src.y};
+  const vx=tx-src.x,vy=ty-src.y;
+  old.vx=old.vx*.52+vx*moved*2.4;old.vy=old.vy*.52+vy*moved*2.4;
+  old.mag=Math.min(1.5,old.mag*.58+moved*1.8);old.last=now;old.fromX=src.x;old.fromY=src.y;
+  liquidSubFlowV22.set(k,old);
+  if(vy>0&&liquidSubSupportedV22(tx,ty,src.kind)){
+    const ik=liquidFlowKeyV22(tx,ty,src.kind),im=liquidSubImpactV22.get(ik)||{s:0,last:now};
+    im.s=Math.min(1,im.s*.62+moved*1.7);im.last=now;liquidSubImpactV22.set(ik,im)
+  }
+}
+function liquidFlowAtV22(x,y,kind,now){
+  const k=liquidFlowKeyV22(x,y,kind),q=liquidSubFlowV22.get(k);if(!q)return null;
+  const age=now-q.last;if(age>650){liquidSubFlowV22.delete(k);return null}
+  const f=1-age/650;return{vx:q.vx*f,vy:q.vy*f,mag:q.mag*f,fromX:q.fromX,fromY:q.fromY}
+}
+function liquidImpactAtV22(x,y,kind,now){
+  const k=liquidFlowKeyV22(x,y,kind),q=liquidSubImpactV22.get(k);if(!q)return 0;
+  const age=now-q.last;if(age>820){liquidSubImpactV22.delete(k);return 0}return q.s*(1-age/820)
+}
+function liquidQueueV22(changes,src,tx,ty,amount,now){
+  if(amount<=.0001||!liquidSubOpenV22(tx,ty))return 0;
+  const dst=liquidSubRecV22(tx,ty);if(dst&&dst.kind!==src.kind)return 0;
+  amount=Math.min(amount,src._remaining);if(amount<=.0001)return 0;
+  const sk=liquidSubKeyV22(src.x,src.y),dk=liquidSubKeyV22(tx,ty);
+  let a=changes.get(sk);if(!a){a={x:src.x,y:src.y,kind:src.kind,d:0};changes.set(sk,a)}a.d-=amount;
+  let b=changes.get(dk);if(!b){b={x:tx,y:ty,kind:src.kind,d:0};changes.set(dk,b)}b.d+=amount;
+  src._remaining-=amount;liquidMarkFlowV22(src,tx,ty,amount,now);return amount
+}
+function liquidApplyChangesV22(changes){
+  for(const [k,c] of changes){
+    const old=liquidSubV22.get(k),next=(old?old.a:0)+c.d;
+    if(next<=.00005){liquidSubV22.delete(k);continue}
+    if(old){old.a=next}else liquidSubV22.set(k,{x:c.x,y:c.y,kind:c.kind,a:next})
+  }
+}
+function liquidStepSubV22(kind,now){
+  liquidV22Init();const sb=liquidSBV22(),center=cam.x/sb,range=24*liquidSubScaleV22*3.15,arr=[];
+  for(const r of liquidSubV22.values())if(r.kind===kind&&Math.abs(r.x-center)<=range)arr.push(r);
+  if(arr.length>9000){arr.sort((a,b)=>Math.abs(a.x-center)-Math.abs(b.x-center));arr.length=9000}
+  const changes=new Map(),lava=kind==='lava',flip=(liquidSubTickV22&1)?1:-1;
+  for(const r of arr)r._remaining=r.a;
+  for(const src of arr){
+    let remaining=src._remaining;if(remaining<=.001)continue;
+    const by=src.y+1,bm=liquidSubMassV22(src.x,by,kind);
+    if(bm!==null&&liquidSubOpenV22(src.x,by)){
+      let flow=liquidStableBottomV22(remaining+bm,kind)-bm;
+      const min=lava?.007:.0035,max=lava?.19:.62;
+      if(flow>min)flow*=bm<.02?(lava?.52:.90):(lava?.34:.64);
+      flow=clamp(flow,0,Math.min(max,src._remaining));liquidQueueV22(changes,src,src.x,by,flow,now)
+    }
+    if(src._remaining<=.001)continue;
+    const dirs=flip>0?[1,-1]:[-1,1];
+    for(const dx of dirs){
+      if(src._remaining<=.001)break;const nx=src.x+dx,ny=src.y,nm=liquidSubMassV22(nx,ny,kind);
+      if(nm===null||!liquidSubOpenV22(nx,ny))continue;
+      const diff=src.a-nm,min=lava?.010:.004;if(diff<=min)continue;
+      let flow=diff*(lava?.095:.19);if(flow>min)flow*=lava?.62:.72;
+      flow=Math.min(flow,lava?.050:.17,src._remaining);liquidQueueV22(changes,src,nx,ny,flow,now)
+    }
+    if(src._remaining<=.001)continue;
+    const uy=src.y-1,um=liquidSubMassV22(src.x,uy,kind);
+    if(um!==null&&liquidSubOpenV22(src.x,uy)){
+      let flow=src._remaining-liquidStableBottomV22(src._remaining+um,kind);
+      const min=lava?.010:.004;if(flow>min)flow*=lava?.24:.42;
+      flow=clamp(flow,0,Math.min(lava?.035:.10,src._remaining));liquidQueueV22(changes,src,src.x,uy,flow,now)
+    }
+  }
+  for(const r of arr)delete r._remaining;
+  liquidApplyChangesV22(changes)
+}
+function liquidCleanV22(now){
+  if(liquidSubTickV22%120!==0)return;
+  for(const [k,r] of liquidSubV22)if(!Number.isFinite(r.a)||r.a<.00005)liquidSubV22.delete(k);
+  for(const [k,q] of liquidSubFlowV22)if(now-q.last>900)liquidSubFlowV22.delete(k);
+  for(const [k,q] of liquidSubImpactV22)if(now-q.last>1000)liquidSubImpactV22.delete(k);
+  for(const [k,q] of liquidSubVisualV22){const bits=k.split(':'),xy=bits[1]?.split(',');if(!xy||!liquidSubRecV22(+xy[0],+xy[1]))liquidSubVisualV22.delete(k)}
+}
+function liquidReactV22(now){
+  if(!Number.isFinite(liquidLastReactV18))liquidLastReactV18=0;if(now-liquidLastReactV18<125)return;liquidLastReactV18=now;
+  let made=0;const vals=[...liquidSubV22.values()];
+  for(const w of vals){
+    if(w.kind!=='water'||w.a<.10)continue;
+    for(const d of [[1,0],[-1,0],[0,1],[0,-1]]){
+      const l=liquidSubRecV22(w.x+d[0],w.y+d[1]);if(!l||l.kind!=='lava'||l.a<.10)continue;
+      const consume=Math.min(.42,w.a,l.a);w.a-=consume;l.a-=consume;
+      const x=(liquidSubCtrV22(w.x)+liquidSubCtrV22(l.x))/2,y=(liquidSubCtrV22(w.y)+liquidSubCtrV22(l.y))/2;
+      createObsidian(x,y,{angle:(hash01(w.x,l.y,2201)-.5)*.05});if(window.SkyAudio?.sizzle)SkyAudio.sizzle();made++;break
+    }
+    if(made>=3)break
+  }
+  if(made){for(const [k,r] of liquidSubV22)if(r.a<.00005)liquidSubV22.delete(k);wake();saveSoon()}
+}
+function updateBuoyancyV22(){
+  for(const z of bs){
+    if(!z.game?.placed||z.isStatic)continue;
+    const sb=liquidSBV22(),x0=Math.floor(z.bounds.min.x/sb),x1=Math.floor(z.bounds.max.x/sb),y0=Math.floor(z.bounds.min.y/sb),y1=Math.floor(z.bounds.max.y/sb);
+    const count=Math.max(1,(x1-x0+1)*(y1-y0+1)),stride=count>90?2:1;let wet=0,n=0;
+    for(let y=y0;y<=y1;y+=stride)for(let x=x0;x<=x1;x+=stride){n++;const r=liquidSubRecV22(x,y);if(r?.kind==='water')wet+=clamp(r.a,0,1)}
+    const coverage=clamp(wet/Math.max(1,n*.58),0,1);
+    if(coverage<=.015){wetBodies.delete(z);continue}
+    if(z.game.material==='dirt'){
+      Body.applyForce(z,z.position,{x:0,y:-z.mass*.0017*(.48+coverage)});Body.setVelocity(z,{x:z.velocity.x*.992,y:z.velocity.y*.979});Body.setAngularVelocity(z,z.angularVelocity*.989)
+    }else if(z.game.material==='stone'||z.game.material==='deepslate'||z.game.material==='obsidian')Body.applyForce(z,z.position,{x:0,y:z.mass*.00018*(.25+coverage)});
+    if(!wetBodies.has(z)){wetBodies.add(z);if(window.SkyAudio?.splash)SkyAudio.splash('water')}
+  }
+}
+function updateLiquids(now){
+  liquidV22Init();liquidSubTickV22++;
+  if(liquidSubTickV22%2===0)liquidStepSubV22('water',now);
+  if(liquidSubTickV22%5===0)liquidStepSubV22('lava',now);
+  if(liquidSubTickV22%4===0)updateBuoyancyV22();
+  liquidReactV22(now);liquidCleanV22(now)
+}
+
+function liquidVisualAmountV22(r,now){
+  liquidV22Init();const k=r.kind+':'+r.x+','+r.y,old=liquidSubVisualV22.get(k);
+  if(!old){const q={a:r.a,t:now};liquidSubVisualV22.set(k,q);return clamp(q.a,0,1)}
+  const dt=clamp(now-old.t,0,70),tau=r.kind==='lava'?170:82,f=1-Math.exp(-dt/tau);old.a+=(r.a-old.a)*f;old.t=now;return clamp(old.a,0,1)
+}
+function liquidFallingV22(r,now){
+  if(!r||r.a<=.003||!liquidSubOpenV22(r.x,r.y+1))return false;
+  const b=liquidSubRecV22(r.x,r.y+1);if(b&&b.kind!==r.kind)return false;if(b&&b.kind===r.kind&&b.a>.62)return false;
+  const f=liquidFlowAtV22(r.x,r.y,r.kind,now);return r.a>.018||!!f&&f.vy>.015
+}
+function liquidSurfaceV22(r,now){
+  if(!r||r.a<=.003||liquidFallingV22(r,now)||!liquidSubSupportedV22(r.x,r.y,r.kind))return false;
+  const a=liquidSubRecV22(r.x,r.y-1);return !a||a.kind!==r.kind||a.a<.028
+}
+function liquidSurfaceYV22(r,now){
+  const sb=liquidSBV22(),a=liquidVisualAmountV22(r,now);let y=(r.y+1-a)*sb;
+  const imp=liquidImpactAtV22(r.x,r.y,r.kind,now);if(imp>0)y+=Math.sin(now*.012+r.x*.71)*sb*.045*imp;
+  return y
+}
+function liquidDrawRoundedRectV22(x,y,w,h,r){
+  r=Math.max(0,Math.min(r,w/2,h/2));ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.quadraticCurveTo(x+w,y,x+w,y+r);ctx.lineTo(x+w,y+h-r);ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);ctx.lineTo(x+r,y+h);ctx.quadraticCurveTo(x,y+h,x,y+h-r);ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);ctx.closePath()
+}
+function liquidDrawDeepBandsV22(now,left,right){
+  const sb=liquidSBV22(),rows=new Map();
+  for(const r of liquidSubV22.values()){
+    const wx=liquidSubCtrV22(r.x);if(r.a<=.003||wx<left||wx>right||liquidFallingV22(r,now)||liquidSurfaceV22(r,now)||!liquidSubSupportedV22(r.x,r.y,r.kind))continue;
+    const k=r.kind+':'+r.y;if(!rows.has(k))rows.set(k,[]);rows.get(k).push(r)
+  }
+  for(const arr of rows.values()){
+    arr.sort((a,b)=>a.x-b.x);let run=[];
+    const flush=()=>{if(!run.length)return;const lava=run[0].kind==='lava',l=run[0].x*sb,r=(run[run.length-1].x+1)*sb,top=run[0].y*sb-.8,bottom=(run[0].y+1)*sb+.8,a=w2s(l,top),b=w2s(r,bottom),rad=Math.max(1,2.8*cam.z);ctx.save();ctx.globalAlpha=lava?.92:.70;ctx.fillStyle=lava?'#e94b20':'#168cda';liquidDrawRoundedRectV22(a.x,a.y,b.x-a.x,b.y-a.y,rad);ctx.fill();if(lava){ctx.globalAlpha=.16;ctx.fillStyle='#ff9b35';ctx.fillRect(a.x+rad,a.y+(b.y-a.y)*.27,Math.max(1,b.x-a.x-rad*2),Math.max(1,(b.y-a.y)*.12))}ctx.restore();run=[]};
+    for(const q of arr){if(run.length&&q.x!==run[run.length-1].x+1)flush();run.push(q)}flush()
+  }
+}
+function liquidDrawSurfaceCellsV22(run,now){
+  if(!run.length)return;const sb=liquidSBV22(),kind=run[0].kind,lava=kind==='lava';
+  const pts=[];
+  for(const r of run){
+    const sy=liquidSurfaceYV22(r,now),bottom=(r.y+1)*sb,l=r.x*sb-.8,rr=(r.x+1)*sb+.8,a=w2s(l,sy),b=w2s(rr,bottom);
+    ctx.save();ctx.globalAlpha=lava?.92:.70;ctx.fillStyle=lava?'#e94b20':'#168cda';ctx.fillRect(a.x,a.y,b.x-a.x,b.y-a.y+.5);ctx.restore();pts.push({x:liquidSubCtrV22(r.x),y:sy,r})
+  }
+  if(!pts.length)return;
+  const smooth=[];for(let i=0;i<pts.length;i++){const p=pts[i],p0=pts[Math.max(0,i-1)],p1=pts[Math.min(pts.length-1,i+1)];smooth.push({x:p.x,y:p.y*.58+p0.y*.21+p1.y*.21})}
+  const left=run[0].x*sb+sb*.06,right=(run[run.length-1].x+1)*sb-sb*.06;
+  smooth.unshift({x:left,y:smooth[0].y});smooth.push({x:right,y:smooth[smooth.length-1].y});
+  const S=p=>w2s(p.x,p.y);ctx.save();ctx.globalAlpha=lava?.70:.48;ctx.strokeStyle=lava?'#ffd45c':'#b9edff';ctx.lineWidth=Math.max(1,1.2*cam.z);ctx.lineCap='round';ctx.lineJoin='round';ctx.beginPath();let p=S(smooth[0]);ctx.moveTo(p.x,p.y);
+  for(let i=1;i<smooth.length;i++){const prev=smooth[i-1],cur=smooth[i],mid=S({x:(prev.x+cur.x)/2,y:(prev.y+cur.y)/2}),cp=S(prev);if(i===1)ctx.lineTo(mid.x,mid.y);else ctx.quadraticCurveTo(cp.x,cp.y,mid.x,mid.y);if(i===smooth.length-1){const e=S(cur);ctx.quadraticCurveTo(e.x,e.y,e.x,e.y)}}ctx.stroke();ctx.restore()
+}
+function liquidDrawSurfacesV22(now,left,right){
+  const cols=[];for(const r of liquidSubV22.values()){const wx=liquidSubCtrV22(r.x);if(wx<left||wx>right||!liquidSurfaceV22(r,now))continue;cols.push(r)}
+  cols.sort((a,b)=>a.kind.localeCompare(b.kind)||a.x-b.x||a.y-b.y);let run=[];
+  const flush=()=>{liquidDrawSurfaceCellsV22(run,now);run=[]};
+  for(const r of cols){if(run.length){const p=run[run.length-1];if(r.kind!==p.kind||r.x!==p.x+1||Math.abs(r.y-p.y)>1)flush()}run.push(r)}flush()
+}
+function liquidFallingMapV22(now,left,right){
+  const map=new Map();for(const r of liquidSubV22.values()){const wx=liquidSubCtrV22(r.x);if(wx<left||wx>right||!liquidFallingV22(r,now))continue;map.set(liquidSubKeyV22(r.x,r.y),r)}return map
+}
+function liquidTraceStreamsV22(now,left,right){
+  const fall=liquidFallingMapV22(now,left,right),used=new Set(),chains=[];
+  const aboveAny=(r)=>{for(let dx=-1;dx<=1;dx++)if(fall.has(liquidSubKeyV22(r.x+dx,r.y-1)))return true;return false};
+  const seeds=[...fall.values()].filter(r=>!aboveAny(r)).sort((a,b)=>a.y-b.y);
+  const trace=(seed)=>{const chain=[];let cur=seed;while(cur&&!used.has(liquidSubKeyV22(cur.x,cur.y))&&chain.length<96){const ck=liquidSubKeyV22(cur.x,cur.y);used.add(ck);chain.push(cur);let best=null,score=-1;for(let dx=-1;dx<=1;dx++){const n=fall.get(liquidSubKeyV22(cur.x+dx,cur.y+1));if(!n||used.has(liquidSubKeyV22(n.x,n.y))||n.kind!==cur.kind)continue;const f=liquidFlowAtV22(n.x,n.y,n.kind,now),s=n.a+(f?.mag||0)*.75-(Math.abs(dx)*.08);if(s>score){score=s;best=n}}cur=best}if(chain.length)chains.push(chain)};
+  for(const s of seeds)trace(s);for(const r of fall.values())if(!used.has(liquidSubKeyV22(r.x,r.y)))trace(r);return chains
+}
+function liquidSmoothScreenPathV22(pts){
+  if(!pts.length)return;ctx.beginPath();ctx.moveTo(pts[0].x,pts[0].y);if(pts.length===1)return;
+  for(let i=1;i<pts.length;i++){const a=pts[i-1],b=pts[i],m={x:(a.x+b.x)/2,y:(a.y+b.y)/2};if(i===1)ctx.lineTo(m.x,m.y);else ctx.quadraticCurveTo(a.x,a.y,m.x,m.y);if(i===pts.length-1)ctx.quadraticCurveTo(b.x,b.y,b.x,b.y)}
+}
+function liquidDrawRibbonV22(chain,now){
+  if(!chain.length)return;const sb=liquidSBV22(),first=chain[0],last=chain[chain.length-1],kind=first.kind,lava=kind==='lava',centers=[];
+  const ff=liquidFlowAtV22(first.x,first.y,kind,now),source=ff?liquidSubRecV22(ff.fromX,ff.fromY):null;
+  if(source&&source.kind===kind&&liquidSubSupportedV22(source.x,source.y,kind)&&ff.fromY===first.y){
+    const boundary=(source.x<first.x?first.x:source.x)*sb,sy=liquidSurfaceYV22(source,now);centers.push({x:boundary+(source.x<first.x?1:-1)*sb*.04,y:sy,w:sb*.15})
+  }
+  for(let i=0;i<chain.length;i++){
+    const r=chain[i],t=chain.length<=1?0:i/(chain.length-1),f=liquidFlowAtV22(r.x,r.y,kind,now),drift=clamp(f?.vx||0,-.32,.32)*sb*.42;
+    const wobble=Math.sin(now*(lava?.0010:.0017)+r.x*.53+r.y*.21+t*2.3)*sb*(lava?.018:.032);
+    const s=Math.max(.08,Math.min(1.2,r.a*.55+(f?.mag||0)));
+    centers.push({x:liquidSubCtrV22(r.x)+drift+wobble,y:liquidSubCtrV22(r.y),w:sb*(lava?.18:.14)*(1+s*(lava?.58:.88))})
+  }
+  const below=liquidSubRecV22(last.x,last.y+1);
+  if(below&&below.kind===kind&&liquidSubSupportedV22(below.x,below.y,kind))centers.push({x:liquidSubCtrV22(below.x),y:liquidSurfaceYV22(below,now),w:sb*(lava?.17:.13)});
+  if(centers.length<2)return;
+  const left=[],right=[],screen=[];
+  for(const p of centers)screen.push({...w2s(p.x,p.y),w:p.w*cam.z});
+  for(let i=0;i<screen.length;i++){const p=screen[i],a=screen[Math.max(0,i-1)],b=screen[Math.min(screen.length-1,i+1)],dx=b.x-a.x,dy=b.y-a.y,len=Math.max(.001,Math.hypot(dx,dy)),nx=-dy/len,ny=dx/len,hw=p.w*.5;left.push({x:p.x+nx*hw,y:p.y+ny*hw});right.push({x:p.x-nx*hw,y:p.y-ny*hw})}
+  ctx.save();ctx.globalAlpha=lava?.89:.72;ctx.fillStyle=lava?'#e94b20':'#168cda';liquidSmoothScreenPathV22(left);for(let i=right.length-1;i>=0;i--){const p=right[i];ctx.lineTo(p.x,p.y)}ctx.closePath();ctx.fill();
+  ctx.globalAlpha=lava?.43:.20;ctx.strokeStyle=lava?'#ffd45c':'#d8f5ff';ctx.lineWidth=Math.max(1,(screen.reduce((s,p)=>s+p.w,0)/screen.length)*.14);ctx.lineCap='round';liquidSmoothScreenPathV22(screen);ctx.stroke();
+  const impact=below&&below.kind===kind&&liquidSubSupportedV22(below.x,below.y,kind)?liquidImpactAtV22(below.x,below.y,kind,now):0;
+  if(impact>.03){const p=screen[screen.length-1],phase=now*.010+last.x*.9;ctx.globalAlpha=(lava?.24:.18)*impact;ctx.strokeStyle=lava?'#ffb246':'#9fe4ff';ctx.lineWidth=Math.max(1,1.1*cam.z);ctx.beginPath();ctx.ellipse(p.x,p.y,Math.max(2,8*cam.z*impact),Math.max(1,2.2*cam.z*impact),0,0,Math.PI*2);ctx.stroke();if(!lava){ctx.fillStyle='#9fe4ff';for(let i=0;i<2;i++){const ox=Math.sin(phase+i*2.1)*7*cam.z*impact,oy=-Math.abs(Math.cos(phase*.85+i))*8*cam.z*impact;ctx.globalAlpha=.18*impact;ctx.beginPath();ctx.arc(p.x+ox,p.y+oy,Math.max(1,1.4*cam.z*impact),0,Math.PI*2);ctx.fill()}}}
+  ctx.restore()
+}
+function drawMappedLiquids(now){
+  liquidV22Init();const left=cam.x-W/(2*cam.z)-B*2,right=cam.x+W/(2*cam.z)+B*2;
+  liquidDrawDeepBandsV22(now,left,right);liquidDrawSurfacesV22(now,left,right);for(const chain of liquidTraceStreamsV22(now,left,right))liquidDrawRibbonV22(chain,now)
+}
+function drawSpillStreamsV19(now){}
+function liquidDrawMotionStreamsV20(now,left,right){}
+
+function liquidMigrateV18ToV22(){
+  liquidV22Init();if(!liquidCellsV18?.size)return false;
+  liquidSubV22.clear();for(const r of liquidCellsV18.values())liquidSeedTileV22(r.x,r.y,r.kind,clamp(r.a,0,1));
+  if(liquidSeededV18)for(const id of liquidSeededV18)liquidSubSeededV22.add(id);else if(fluidSeeded)for(const id of fluidSeeded)liquidSubSeededV22.add(id);
+  liquidCellsV18.clear();return true
+}
+var v22BaseSaveGame=saveGame;
+saveGame=function(){
+  v22BaseSaveGame();liquidV22Init();
+  try{const raw=localStorage.getItem(SAVE_KEY);if(!raw)return;const s=JSON.parse(raw);
+    s.liquidSubV22=[...liquidSubV22.values()].filter(r=>r.a>.00005).map(r=>[r.x,r.y,r.kind==='lava'?1:0,Math.max(1,Math.min(65535,Math.round(r.a*10000)))]);
+    s.liquidSubSeededV22=[...liquidSubSeededV22];s.liquidCellsV18=[];s.liquidSeededV18=[];s.fluids=[];localStorage.setItem(SAVE_KEY,JSON.stringify(s))
+  }catch(e){console.warn('v22 liquid save failed',e)}
+};
+var v22BaseRestoreDynamicState=restoreDynamicState;
+restoreDynamicState=function(s){
+  liquidV22Init();if(!s){v22BaseRestoreDynamicState(s);return}
+  const has=Array.isArray(s.liquidSubV22),copy=has?{...s,liquidCellsV18:[],liquidSeededV18:[],fluids:[]}:s;
+  v22BaseRestoreDynamicState(copy);liquidSubV22.clear();liquidSubSeededV22.clear();liquidSubFlowV22.clear();liquidSubImpactV22.clear();liquidSubVisualV22.clear();
+  if(has){
+    for(const row of s.liquidSubV22){if(!Array.isArray(row)||row.length<4)continue;const x=Math.floor(finite(row[0])),y=Math.floor(finite(row[1])),kind=row[2]===1?'lava':'water',a=finite(row[3])/10000;if(a>.00005)liquidSubV22.set(liquidSubKeyV22(x,y),{x,y,kind,a})}
+    if(Array.isArray(s.liquidSubSeededV22))for(const id of s.liquidSubSeededV22)if(typeof id==='string')liquidSubSeededV22.add(id)
+  }else if(!liquidMigrateV18ToV22()){
+    if(fluidSeeded)for(const id of fluidSeeded)liquidSubSeededV22.add(id);
+    for(const ch of generated)for(const d of pocketDefs(ch))if(fluidSeeded.has(d.id)){liquidSubSeededV22.delete(d.id);seedPocket(d)}
+  }
+  if(liquidCellsV18)liquidCellsV18.clear()
+};
+
+window.__skyStackLiquidDebug=()=>{
+  liquidV22Init();let water=0,lava=0,volume=0,falling=0,now=performance.now();
+  for(const r of liquidSubV22.values()){if(r.kind==='water')water++;else lava++;volume+=r.a;if(liquidFallingV22(r,now))falling++}
+  return{build:'v22',subcells:liquidSubV22.size,water,lava,tileEquivalentVolume:+(volume/4).toFixed(2),falling,scale:liquidSubScaleV22}
+};
