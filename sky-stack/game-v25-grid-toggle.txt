@@ -1,0 +1,111 @@
+// --- v25 BUILD GRID TOGGLE ---------------------------------------------------------
+// Terrain/mining remains on the world grid. Player-built pieces keep block-sized
+// dimensions/costs, but GRID OFF allows arbitrary world-space placement offsets.
+var gridSnapV25=true;
+const GRID_PREF_KEY_V25='skyStack.gridSnap.v1';
+SKY_BUILD='v25';
+
+try{
+  const saved=localStorage.getItem(GRID_PREF_KEY_V25);
+  if(saved==='0')gridSnapV25=false;
+}catch{}
+
+const oneSnapV25=one;
+const solidSnapV25=solid;
+const previewSnapV25=preview;
+
+function freeBuildRectV25(a,b,limit=Infinity){
+  const dx=b.x-a.x,dy=b.y-a.y;
+  const cap=Number.isFinite(limit)?Math.max(1,Math.floor(limit)):9999;
+  const nx=Math.min(cap,Math.max(1,Math.floor(Math.abs(dx)/B)+1));
+  const ny=Math.min(cap,Math.max(1,Math.floor(Math.abs(dy)/B)+1));
+  const sx=dx<0?-1:1,sy=dy<0?-1:1;
+  const cx=a.x+sx*(nx-1)*B/2,cy=a.y+sy*(ny-1)*B/2;
+  const w=nx*B-1,h=ny*B-1;
+  return{
+    cx,cy,w,h,nx,ny,cost:nx*ny,
+    minx:cx-w/2,maxx:cx+w/2,miny:cy-h/2,maxy:cy+h/2
+  }
+}
+function freeOneRectV25(p){
+  const w=B-1,h=B-1;
+  return{cx:p.x,cy:p.y,w,h,nx:1,ny:1,cost:1,minx:p.x-w/2,maxx:p.x+w/2,miny:p.y-h/2,maxy:p.y+h/2}
+}
+function worldPlacementStateV25(r){
+  const pad=1.25;
+  const region={
+    min:{x:r.minx+pad,y:r.miny+pad},
+    max:{x:r.maxx-pad,y:r.maxy-pad}
+  };
+  const hits=Query.region([...bs],region).filter(z=>z.game&&!z.game.liquid&&!z.game.reservoir);
+  return{
+    terrain:hits.some(z=>z.game.terrain),
+    placed:hits.some(z=>z.game.placed)
+  }
+}
+function attemptWorldPlacementV25(r,commit){
+  const state=worldPlacementStateV25(r);
+  if(state.terrain){toast('BLOCKED BY THE WORLD');return}
+  if(state.placed){warnOverlap(commit);return}
+  commit()
+}
+function updateGridToggleV25(){
+  const b=$('gridToggle');if(!b)return;
+  b.textContent=gridSnapV25?'▦ GRID ON':'▱ GRID OFF';
+  b.classList.toggle('gridOff',!gridSnapV25);
+  b.setAttribute('aria-pressed',gridSnapV25?'true':'false');
+  b.setAttribute('title',gridSnapV25?'Building snaps to the world grid':'Free placement — building does not snap to the world grid')
+}
+function setGridSnapV25(on,notify=true){
+  gridSnapV25=!!on;
+  try{localStorage.setItem(GRID_PREF_KEY_V25,gridSnapV25?'1':'0')}catch{}
+  updateGridToggleV25();
+  if(notify)toast(gridSnapV25?'GRID SNAP ON':'GRID SNAP OFF · FREE PLACEMENT')
+}
+const gridBtnV25=$('gridToggle');
+if(gridBtnV25){
+  gridBtnV25.addEventListener('click',e=>{
+    e.stopPropagation();setGridSnapV25(!gridSnapV25,true);if(window.SkyAudio?.ui)SkyAudio.ui()
+  });
+  updateGridToggleV25()
+}
+
+one=function(m,p){
+  if(gridSnapV25)return oneSnapV25(m,p);
+  if(!inv[m])return toast('NO '+m.toUpperCase()+' — MINE SOME!');
+  const r=freeOneRectV25(p);
+  attemptWorldPlacementV25(r,()=>{
+    if(!inv[m])return;
+    inv[m]--;
+    mk(r.cx,r.cy,m,{placed:true});
+    ui();SkyAudio.place(m,1);saveSoon()
+  })
+};
+
+solid=function(m,a,b){
+  if(gridSnapV25)return solidSnapV25(m,a,b);
+  const r=freeBuildRectV25(a,b,buildLimit());
+  if(r.cost===1)return one(m,b);
+  if(inv[m]<r.cost)return toast('NEED '+r.cost+' '+m.toUpperCase());
+  attemptWorldPlacementV25(r,()=>{
+    if(inv[m]<r.cost)return;
+    inv[m]-=r.cost;
+    mk(r.cx,r.cy,m,{w:r.w,h:r.h,cost:r.cost,placed:true});
+    ui();SkyAudio.place(m,r.cost);saveSoon()
+  })
+};
+
+preview=function(){
+  if(gridSnapV25)return previewSnapV25();
+  if(!gesture||!M[gesture.t]||gesture.t==='bedrock'||!shape||!gesture.moved)return;
+  const r=freeBuildRectV25(gesture.a,gesture.b,buildLimit());
+  const drawR=r.cost===1?freeOneRectV25(gesture.b):r;
+  const a=w2s(drawR.minx,drawR.miny),w=drawR.w*cam.z,h=drawR.h*cam.z;
+  ctx.save();
+  ctx.globalAlpha=.35;ctx.fillStyle=M[gesture.t].col[0];ctx.fillRect(a.x,a.y,w,h);
+  ctx.globalAlpha=1;ctx.fillStyle='#fff';ctx.font='900 12px ui-monospace';
+  ctx.fillText(drawR.nx+'×'+drawR.ny+' · '+drawR.cost,a.x+5,a.y+16);
+  ctx.restore()
+};
+
+window.__skyStackGridDebug=()=>({build:'v25',grid:gridSnapV25?'on':'off'});
