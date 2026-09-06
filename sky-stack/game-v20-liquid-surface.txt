@@ -1,0 +1,185 @@
+
+// --- v20 CONTINUOUS LIQUID SURFACE ------------------------------------------------
+// Keep the cheap conserved cell-volume simulation underneath, but visually separate
+// "how much liquid is stored here" from "how moving liquid should look". Falling water
+// renders as a stream through a cell; settled water renders as a smoothed shared surface.
+var liquidMotionV20,liquidVisualV20,liquidFlowClockV20;
+SKY_BUILD='v20';
+
+function liquidV20Init(){
+  liquidFlowInitV19();
+  if(!liquidMotionV20)liquidMotionV20=new Map();
+  if(!liquidVisualV20)liquidVisualV20=new Map();
+  if(!Number.isFinite(liquidFlowClockV20))liquidFlowClockV20=performance.now()
+}
+function liquidMotionKeyV20(x,y,kind){return kind+':'+x+','+y}
+function liquidMarkMotionV20(src,tx,ty,moved,now){
+  if(moved<=.0005)return;
+  liquidV20Init();
+  const k=liquidMotionKeyV20(tx,ty,src.kind),old=liquidMotionV20.get(k)||{down:0,side:0,last:now,fromX:tx};
+  const down=ty>src.y,side=tx!==src.x;
+  if(down)old.down=Math.min(1,old.down*.58+moved*4.1);
+  if(side)old.side=Math.min(1,old.side*.62+moved*5.0);
+  old.fromX=src.x;old.last=now;liquidMotionV20.set(k,old)
+}
+function liquidMoveV20(src,tx,ty,want,now){
+  const moved=liquidMoveV18(src,tx,ty,want);
+  if(moved>.0005)liquidMarkMotionV20(src,tx,ty,moved,now);
+  return moved
+}
+function liquidMotionV20At(x,y,kind,now){
+  liquidV20Init();const q=liquidMotionV20.get(liquidMotionKeyV20(x,y,kind));
+  if(!q)return null;const age=now-q.last;if(age>720){liquidMotionV20.delete(liquidMotionKeyV20(x,y,kind));return null}
+  const fade=1-age/720;return{down:q.down*fade,side:q.side*fade,last:q.last,fromX:q.fromX}
+}
+function liquidVisualAmountV20(r,now){
+  liquidV20Init();const k=r.kind+':'+r.x+','+r.y,old=liquidVisualV20.get(k);
+  if(!old){const q={a:r.a,t:now};liquidVisualV20.set(k,q);return q.a}
+  const dt=clamp(now-old.t,0,80),tau=r.kind==='lava'?220:125;
+  const f=1-Math.exp(-dt/tau);old.a+=(r.a-old.a)*f;old.t=now;
+  if(Math.abs(old.a-r.a)<.001)old.a=r.a;return clamp(old.a,0,1)
+}
+function liquidCleanupV20(now){
+  if(liquidTickV18%90!==0)return;
+  for(const [k,q] of liquidMotionV20)if(now-q.last>900)liquidMotionV20.delete(k);
+  for(const [k,q] of liquidVisualV20){
+    const bits=k.split(':'),xy=bits[1]?.split(',');
+    if(!xy||!liquidRecV18(+xy[0],+xy[1]))liquidVisualV20.delete(k)
+  }
+}
+
+// Smaller, more frequent transfers make the underlying flow less visibly quantized.
+// Water remains fast overall, but arrives in many little increments instead of a few
+// large tile-sized gulps. Lava keeps its slower viscous cadence.
+function liquidStepKindV18(kind){
+  liquidV20Init();
+  const centerCh=Math.floor(cam.x/(24*B)),range=3,arr=[];
+  for(const r of liquidCellsV18.values())if(r.kind===kind&&Math.abs(Math.floor(r.x/24)-centerCh)<=range)arr.push(r);
+  const flip=(liquidTickV18&1)?1:-1,now=performance.now(),lava=kind==='lava';
+  arr.sort((a,b)=>b.y-a.y||flip*(a.x-b.x));
+  for(const src of arr){
+    if(src.a<=.002)continue;
+    const head=liquidHeadV19(src.x,src.y,kind),below=liquidRecV18(src.x,src.y+1);
+    const belowOpen=liquidOpenV18(src.x,src.y+1)&&(!below||below.kind===kind&&below.a<.999);
+    if(belowOpen){
+      const prior=liquidMotionV20At(src.x,src.y+1,kind,now)?.down||0;
+      const want=Math.min(lava?.11:.24,(lava?.035:.085)+prior*(lava?.045:.105)+head*(lava?.012:.026));
+      liquidMoveV20(src,src.x,src.y+1,want,now)
+    }
+    if(src.a<=.012||!liquidSupportedV19(src.x,src.y,kind))continue;
+    const dirs=flip>0?[1,-1]:[-1,1];
+    for(const dx of dirs){
+      if(src.a<=.012)break;
+      const nx=src.x+dx,ny=src.y;if(!liquidOpenV18(nx,ny))continue;
+      const n=liquidRecV18(nx,ny);if(n&&n.kind!==kind)continue;
+      const na=n?n.a:0,diff=src.a-na;if(diff<=.028)continue;
+      const unsupportedDest=liquidOpenV18(nx,ny+1)&&!liquidSupportedV19(nx,ny,kind);
+      if(unsupportedDest){
+        const q=liquidChargeV19(src,dx,now),threshold=lava?.68:.50;
+        if(q.c<threshold)continue;
+        const pressure=liquidHeadV19(src.x,src.y,kind);
+        const want=Math.min(diff*.20,lava?(.009+pressure*.0035):(.030+pressure*.0075));
+        const moved=liquidMoveV20(src,nx,ny,want,now);
+        if(moved>.001){q.c=Math.max(threshold*.84,q.c-(lava?.04:.055));liquidNoteSpillV19(src,dx,moved,now)}
+      }else{
+        const want=Math.min(lava?.024:.058,diff*(lava?.12:.18));
+        liquidMoveV20(src,nx,ny,want,now)
+      }
+    }
+  }
+  liquidDeleteTinyV18();liquidCleanupV20(now);if(liquidTickV18%45===0)liquidCleanupFlowV19(now)
+}
+function updateLiquids(now){
+  liquidV20Init();liquidTickV18++;
+  // More frequent, smaller water steps feel continuous while remaining cheap because
+  // only nearby liquid cells are solved. Lava intentionally remains slower.
+  if(liquidTickV18%3===0){liquidStepKindV18('water');updateBuoyancyV18()}
+  if(liquidTickV18%6===0)liquidStepKindV18('lava');
+  liquidReactV18(now)
+}
+
+function liquidSupportedPoolV20(r){
+  if(!liquidOpenV18(r.x,r.y+1))return true;
+  const b=liquidRecV18(r.x,r.y+1);return !!b&&b.kind===r.kind&&b.a>.60
+}
+function liquidSurfaceCellV20(r){
+  if(!liquidSupportedPoolV20(r))return false;
+  const a=liquidRecV18(r.x,r.y-1);return !a||a.kind!==r.kind||a.a<.035
+}
+function liquidTopWorldV20(r,now){const a=liquidVisualAmountV20(r,now);return(r.y+1-a)*B}
+function liquidSurfaceHeightV20(r,now){
+  let total=liquidTopWorldV20(r,now)*.58,w=.58;
+  for(const dx of[-1,1]){
+    const n=liquidRecV18(r.x+dx,r.y);
+    if(n&&n.kind===r.kind&&liquidSurfaceCellV20(n)){total+=liquidTopWorldV20(n,now)*.21;w+=.21}
+  }
+  return total/w
+}
+function liquidFillDeepCellsV20(now,left,right){
+  for(const r of liquidCellsV18.values()){
+    if(r.a<=.004||ctr(r.x)<left||ctr(r.x)>right)continue;
+    if(liquidSurfaceCellV20(r))continue;
+    const supported=liquidSupportedPoolV20(r);if(!supported)continue;
+    const s=w2s(ctr(r.x),ctr(r.y)),sz=B*cam.z;if(s.y+sz/2<0||s.y-sz/2>HH)continue;
+    const a=liquidVisualAmountV20(r,now),lava=r.kind==='lava';
+    const above=liquidRecV18(r.x,r.y-1),submerged=above&&above.kind===r.kind&&above.a>.04;
+    const h=sz*(submerged?Math.max(.92,a):a),bottom=s.y+sz/2,top=bottom-h;
+    ctx.save();ctx.globalAlpha=lava?.92:.72;ctx.fillStyle=lava?'#e94b20':'#168cda';ctx.fillRect(s.x-sz/2-.6,top,sz+1.2,h+1);
+    if(lava){ctx.globalAlpha=.26;ctx.fillStyle='#ff8a2e';ctx.fillRect(s.x-sz*.46,top+h*.22,sz*.92,Math.max(1,h*.16))}
+    else{ctx.globalAlpha=.10;ctx.fillStyle='#d8f5ff';ctx.fillRect(s.x-sz*.48,top+h*.10,sz*.96,Math.max(1,h*.10))}
+    ctx.restore()
+  }
+}
+function liquidDrawSurfaceRunV20(run,now){
+  if(!run.length)return;const kind=run[0].kind,lava=kind==='lava',y=run[0].y;
+  const leftX=run[0].x*B,rightX=(run[run.length-1].x+1)*B,bottom=(y+1)*B;
+  const centers=run.map(r=>({x:ctr(r.x),y:liquidSurfaceHeightV20(r,now),r})),pts=[];
+  pts.push({x:leftX,y:centers[0].y});for(const p of centers)pts.push({x:p.x,y:p.y});pts.push({x:rightX,y:centers[centers.length-1].y});
+  const S=p=>w2s(p.x,p.y),a=S(pts[0]),br=S({x:rightX,y:bottom}),bl=S({x:leftX,y:bottom});
+  if(Math.min(a.y,br.y)>HH+20||Math.max(a.y,bl.y)<-20)return;
+  const trace=()=>{
+    ctx.beginPath();ctx.moveTo(a.x,a.y);
+    for(let i=1;i<pts.length;i++){
+      const p0=pts[i-1],p1=pts[i],mid={x:(p0.x+p1.x)/2,y:(p0.y+p1.y)/2},sm=S(mid),sp=S(p1);
+      if(i===1)ctx.lineTo(sm.x,sm.y);else{const cp=S(p0);ctx.quadraticCurveTo(cp.x,cp.y,sm.x,sm.y)}
+      if(i===pts.length-1)ctx.quadraticCurveTo(sp.x,sp.y,sp.x,sp.y)
+    }
+  };
+  ctx.save();trace();ctx.lineTo(br.x,br.y);ctx.lineTo(bl.x,bl.y);ctx.closePath();ctx.globalAlpha=lava?.92:.72;ctx.fillStyle=lava?'#e94b20':'#168cda';ctx.fill();
+  trace();ctx.globalAlpha=lava?.70:.52;ctx.strokeStyle=lava?'#ffd45c':'#b9edff';ctx.lineWidth=Math.max(1,1.35*cam.z);ctx.stroke();ctx.restore()
+}
+function liquidDrawSurfacesV20(now,left,right){
+  const byRow=new Map();
+  for(const r of liquidCellsV18.values()){
+    if(r.a<=.004||ctr(r.x)<left||ctr(r.x)>right||!liquidSurfaceCellV20(r))continue;
+    const k=r.kind+':'+r.y;if(!byRow.has(k))byRow.set(k,[]);byRow.get(k).push(r)
+  }
+  for(const arr of byRow.values()){
+    arr.sort((a,b)=>a.x-b.x);let run=[];
+    for(const r of arr){if(run.length&&r.x!==run[run.length-1].x+1){liquidDrawSurfaceRunV20(run,now);run=[]}run.push(r)}
+    liquidDrawSurfaceRunV20(run,now)
+  }
+}
+function liquidDrawMotionStreamsV20(now,left,right){
+  liquidV20Init();
+  for(const r of liquidCellsV18.values()){
+    if(r.a<=.002||ctr(r.x)<left||ctr(r.x)>right)continue;
+    const m=liquidMotionV20At(r.x,r.y,r.kind,now),supported=liquidSupportedPoolV20(r);
+    const fallStrength=Math.max(m?.down||0,supported?0:Math.min(1,r.a*1.35));if(fallStrength<.018)continue;
+    const lava=r.kind==='lava',sz=B*cam.z;
+    let endWorld=(r.y+1)*B;if(supported)endWorld=Math.min(endWorld,liquidSurfaceHeightV20(r,now));
+    const a=w2s(ctr(r.x),r.y*B-.5),b=w2s(ctr(r.x),endWorld+.5);if(b.y<a.y+1)continue;
+    const width=Math.max(1.8,sz*(lava?.10:.062)*(1+fallStrength*(lava?.85:1.35)));
+    ctx.save();ctx.lineCap='round';ctx.globalAlpha=lava?.84:.64;ctx.strokeStyle=lava?'#e94b20':'#168cda';ctx.lineWidth=width;ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();
+    ctx.globalAlpha=lava?.48:.24;ctx.strokeStyle=lava?'#ffd45c':'#d8f5ff';ctx.lineWidth=Math.max(1,width*.22);ctx.beginPath();ctx.moveTo(a.x-width*.12,a.y);ctx.lineTo(b.x-width*.12,b.y);ctx.stroke();ctx.restore()
+  }
+}
+function drawMappedLiquids(now){
+  liquidV20Init();const left=cam.x-W/(2*cam.z)-B*2,right=cam.x+W/(2*cam.z)+B*2;
+  liquidFillDeepCellsV20(now,left,right);liquidDrawSurfacesV20(now,left,right);liquidDrawMotionStreamsV20(now,left,right);drawSpillStreamsV19(now)
+}
+window.__skyStackLiquidDebug=()=>{
+  liquidV20Init();let water=0,lava=0,volume=0,moving=0,now=performance.now();
+  for(const r of liquidCellsV18.values()){if(r.kind==='water')water++;else lava++;volume+=r.a;if(liquidMotionV20At(r.x,r.y,r.kind,now))moving++}
+  return{build:'v20',cells:liquidCellsV18.size,water,lava,volume:+volume.toFixed(2),moving,activeSpills:liquidSpillStreamsV19.size}
+};
