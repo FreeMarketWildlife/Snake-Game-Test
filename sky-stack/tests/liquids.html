@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sky Stack · Liquid playground</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#17232e;color:#edf3ef;font:15px system-ui,sans-serif}main{max-width:1168px;margin:24px auto;padding:0 24px}h1{font-size:24px;margin:4px 0 8px}p{color:#b6c6ce;margin:8px 0 16px}.controls{display:flex;gap:8px;flex-wrap:wrap;margin:16px 0}button,a{font:inherit;padding:10px 15px;border:2px solid #52636c;border-radius:4px;background:#f4efde;color:#263641;text-decoration:none;cursor:pointer}button:active{transform:translateY(1px)}canvas{display:block;width:100%;height:auto;image-rendering:pixelated;border:2px solid #53616a;border-radius:4px}small{color:#9eb1be}#status{color:#90dcdf}header{display:flex;justify-content:space-between;gap:20px;align-items:center}
+</style>
+<main><header><div><small>SKY STACK / LIQUID PLAYGROUND</small><h1>Water that flows. Lava that lingers.</h1></div><a href="../">Play Sky Stack ↗</a></header>
+<p>Open the dam, pour into the pools, and watch them settle. This playground uses the game’s liquid engine and does not touch your saved world.</p>
+<div class="controls"><button id="water">Pour water</button><button id="lava">Pour lava</button><button id="dam" aria-pressed="false">Open water dam</button><button id="source" aria-pressed="true">Stop springs</button><button id="pause" aria-pressed="false">Pause</button><button id="reset">Reset playground</button></div>
+<canvas id="scene" width="1120" height="640" aria-label="Water cascades on the left and a slower lava cascade on the right"></canvas><p id="status">Loading liquids…</p></main>
+<script src="liquid-fixture.js"></script>
+<script>
+var ctx=document.getElementById('scene').getContext('2d');
+(async()=>{
+ for(const name of ['game-v22-liquid-engine.txt','game-v29-liquid-feel.txt']){const response=await fetch('../'+name);if(!response.ok)throw new Error(name);(0,eval)(await response.text())}
+ liquidReactV22=()=>{};
+ let springs=true,paused=false,dam=false,last=0,feed=0;
+ const wall=(x,y)=>grid.set(key(x,y),true);
+ function reset(){
+  liquidV22Init();grid.clear();liquidSubV22.clear();liquidSubFlowV22.clear();liquidSubVisualV22.clear();liquidSubImpactV22.clear();liquidClockV29=null;liquidAccumulatorV29=0;feed=0;dam=false;
+  for(let x=0;x<35;x++)for(let y=18;y<20;y++)wall(x,y);
+  for(let y=3;y<18;y++){wall(0,y);wall(17,y);wall(18,y);wall(34,y)}
+  for(let x=1;x<7;x++)wall(x,7);
+  for(let x=20;x<26;x++)wall(x,7);
+  for(let x=7;x<10;x++)wall(x,11);
+  for(let x=26;x<29;x++)wall(x,12);
+  for(let y=12;y<18;y++)wall(11,y);
+  for(let x=1;x<11;x++)for(let y=16;y<18;y++)liquidSeedTileV22(x,y,'water',.95);
+  for(let x=19;x<34;x++)for(let y=17;y<18;y++)liquidSeedTileV22(x,y,'lava',.95);
+  for(let x=1;x<7;x++)for(let y=5;y<7;y++)liquidSeedTileV22(x,y,'water',1);
+  for(let x=20;x<26;x++)for(let y=5;y<7;y++)liquidSeedTileV22(x,y,'lava',1);
+  document.getElementById('dam').textContent='Open water dam';document.getElementById('dam').setAttribute('aria-pressed','false');
+ }
+ reset();
+ document.getElementById('water').onclick=()=>{for(let x=4;x<10;x++)liquidSubPutV22(x,6,'water',3)};
+ document.getElementById('lava').onclick=()=>{for(let x=43;x<49;x++)liquidSubPutV22(x,6,'lava',3)};
+ document.getElementById('dam').onclick=e=>{dam=!dam;for(let y=12;y<18;y++){if(dam)grid.delete(key(11,y));else{wall(11,y);for(let sx=22;sx<24;sx++)for(let sy=y*2;sy<y*2+2;sy++)liquidSubV22.delete(key(sx,sy))}}e.target.textContent=dam?'Close water dam':'Open water dam';e.target.setAttribute('aria-pressed',String(dam))};
+ document.getElementById('source').onclick=e=>{springs=!springs;e.target.textContent=springs?'Stop springs':'Start springs';e.target.setAttribute('aria-pressed',String(springs))};
+ document.getElementById('pause').onclick=e=>{paused=!paused;liquidClockV29=null;e.target.textContent=paused?'Resume':'Pause';e.target.setAttribute('aria-pressed',String(paused))};
+ document.getElementById('reset').onclick=reset;
+ let drawTime=0;
+ function frame(now){
+  const dt=Math.min(50,now-last);last=now;
+  if(!paused){drawTime+=dt;if(springs){feed+=dt;while(feed>=100){feed-=100;liquidSubPutV22(5,6,'water',.32);liquidSubPutV22(44,6,'lava',.18)}}updateLiquids(now)}
+  ctx.fillStyle='#223849';ctx.fillRect(0,0,W,HH);
+  ctx.fillStyle='#294353';for(let x=0;x<35;x++)for(let y=0;y<18;y++)if((x*7+y*11)%9<2)ctx.fillRect(x*32+4,y*32+6,10,4);
+  for(const k of grid.keys()){
+   const [x,y]=k.split(',').map(Number);ctx.fillStyle='#596066';ctx.fillRect(x*32,y*32,32,32);ctx.fillStyle='#727779';ctx.fillRect(x*32,y*32,32,3);ctx.fillStyle='#404d56';ctx.fillRect(x*32+29,y*32+3,3,29);ctx.fillRect(x*32+3,y*32+29,26,3);
+  }
+  drawMappedLiquids(drawTime);
+  ctx.font='bold 17px monospace';ctx.fillStyle='#b5e8ef';ctx.fillText('WATER',34,38);ctx.fillStyle='#ffcf87';ctx.fillText('LAVA',610,38);
+  ctx.font='13px monospace';ctx.fillStyle='#a6c1cb';ctx.fillText('Fast flow · ripples · pixel foam',34,62);ctx.fillText('Slow flow · molten edges · crust',610,62);
+  document.getElementById('status').textContent=paused?'Paused':`Live · ${liquidSubV22.size} liquid cells · water and lava use the same engine as Sky Stack`;
+  requestAnimationFrame(frame)
+ }
+ requestAnimationFrame(frame)
+})().catch(e=>{console.error(e);document.getElementById('status').textContent=e.message});
+</script></html>

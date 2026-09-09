@@ -1,0 +1,30 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sky Stack · Obsidian material preview</title>
+<style>body{margin:0;background:#17212c;color:#f4eddf;font:15px ui-monospace,monospace}main{max-width:1000px;margin:32px auto;padding:0 20px}h1{font-size:24px}p{color:#b9bdca;line-height:1.6}canvas{width:100%;height:auto;image-rendering:pixelated;border:2px solid #596171;border-radius:5px}a{color:#d9a9f4}</style>
+<main><h1>Obsidian, with a little volcanic glass.</h1><p>Plum-black facets, chipped lilac edges, and a slow glint. Shown against the game’s unchanged deepslate, including buried and damaged blocks.</p><canvas id="art" width="960" height="510" aria-label="Before and after comparison of obsidian embedded in deepslate"></canvas><p><a href="../">Return to Sky Stack ↗</a></p></main>
+<script>
+var canvas=document.getElementById('art'),ctx=canvas.getContext('2d'),B=32,W=960,HH=510,cam={z:2};
+var M={deepslate:{col:['#414651','#30343d']},obsidian:{col:['#201d2c','#121019']}};
+var w2s=(x,y)=>({x,y}),terrainExposed=z=>!z.buried;
+(async()=>{
+ const text=await (await fetch('../game-v8-part3.txt')).text();
+ (0,eval)(text.slice(text.indexOf('function cracks('),text.indexOf('function drawMiner(')));
+ const original=draw;
+ (0,eval)(await (await fetch('../game-v31-obsidian-art.txt')).text());
+ const improved=draw;
+ function frame(){
+  ctx.fillStyle='#17212c';ctx.fillRect(0,0,W,HH);
+  for(let side=0;side<2;side++){
+   ctx.fillStyle=side?'#ddb7ee':'#a5acba';ctx.font='bold 17px monospace';ctx.fillText(side?'AFTER · VOLCANIC GLASS':'BEFORE',side*480+30,35);
+   for(let y=0;y<5;y++)for(let x=0;x<6;x++){
+    const obs=(y===1&&x===2)||(y===2&&x>=2&&x<=4)||(y===3&&x===3);
+    const z={position:{x:side*480+62+x*64,y:88+y*64},angle:0,buried:y>=3,game:{material:obs?'obsidian':'deepslate',w:31,h:31,cx:x,cy:y+30,terrain:true,max:10,hits:y===2&&x===4?5:0}};
+    M.obsidian.col=side?['#302039','#130f20']:['#201d2c','#121019'];(side?improved:original)(z);
+   }
+   ctx.fillStyle='#9ea8b8';ctx.font='12px monospace';ctx.fillText('Bottom rows: buried / dimmed',side*480+30,425);
+   ctx.fillText('Right obsidian: partially mined',side*480+30,446);
+  }
+  requestAnimationFrame(frame)
+ }
+ frame()
+})().catch(e=>{console.error(e);document.querySelector('p').textContent=e.message});
+</script></html>

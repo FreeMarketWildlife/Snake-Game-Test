@@ -1,0 +1,85 @@
+// Developer tools deliberately change the current saved world. Switches are session-only.
+var devToolsV30={oneHit:false,infiniteMiners:false,level:3};
+function devNumberV30(value,max){
+  if(String(value).trim()==='')return null;
+  const n=Number(value);return Number.isFinite(n)&&n>=0&&n<=max?Math.floor(n):null
+}
+function devGoldV30(value){
+  const amount=devNumberV30(value,1000000000);if(amount===null)return false;
+  inv.gold=Math.min(1000000000,inv.gold+amount);ui();refreshMinerMenu();saveGame();return true
+}
+function devHeightV30(value){
+  const height=devNumberV30(value,10000);if(height===null)return false;
+  if(height>best)awardHigh(height);
+  else{best=height;shape=best>=5;stone=best>=10;ui();quest()}
+  highCandidate=null;$('stability').classList.remove('show');saveGame();return true
+}
+function devBreakV30(z,collector='player',worker=null){
+  if(!z?.game||z.game.liquid||z.game.reservoir)return false;
+  if(z.game.material==='bedrock'){
+    const k=key(z.game.cx,z.game.cy);grid.delete(k);removedTerrain.add(k);terrainDamage.delete(k);
+    bs.delete(z);World.remove(eng.world,z);wake();wakeFluids();ui();saveSoon();return true
+  }
+  SkyAudio.hit(z.game.material,true,1);harvest(z,collector,worker);return true
+}
+var devBaseMineV30=mine,devBaseMinerHitV30=minerHit;
+mine=function(p){if(devToolsV30.oneHit)return devBreakV30(at(p));return devBaseMineV30(p)};
+minerHit=function(q,target,beatIndex=0){if(devToolsV30.oneHit)return devBreakV30(target,'miner',q);return devBaseMinerHitV30(q,target,beatIndex)};
+var devBaseUnlockedV30=unlockedMiners,devBaseAvailableV30=availableMiners,devBasePlaceV30=placeMiner;
+unlockedMiners=function(){return devToolsV30.infiniteMiners?Infinity:devBaseUnlockedV30()};
+availableMiners=function(){return devToolsV30.infiniteMiners?Infinity:devBaseAvailableV30()};
+function devSpawnV30(p,level=devToolsV30.level){
+  ensureChunkAtX(p.x);const drop=minerDropPoint(p);
+  return createMinerAt(drop.x,drop.y,{level,dir:Math.random()<.5?-1:1})
+}
+placeMiner=function(p){
+  if(!devToolsV30.infiniteMiners)return devBasePlaceV30(p);
+  devSpawnV30(p);ui();SkyAudio.ui();saveSoon()
+};
+var devBaseUiV30=ui;
+ui=function(){
+  devBaseUiV30();if(devToolsV30.infiniteMiners)$('mc').textContent='∞';
+  const summary=$('devSummary');if(summary)summary.textContent='Gold: '+inv.gold+' · Record: '+best+' m · Active miners: '+miners.size;
+};
+
+function installDevPanelV30(){
+  let button=$('devToggle');
+  if(!button){button=document.createElement('button');button.id='devToggle';button.className='btn';button.textContent='DEV TOOLS';button.title='Developer tools (F2)';button.setAttribute('aria-haspopup','dialog');button.setAttribute('aria-controls','devPanel');document.getElementById('tips').append(button)}
+  const panel=document.createElement('dialog');panel.id='devPanel';panel.setAttribute('aria-labelledby','devTitle');
+  panel.innerHTML=`
+    <header><h2 id="devTitle">DEV TOOLS</h2><button type="button" class="btn" id="devClose" aria-label="Close dev panel">✕</button></header>
+    <p id="devSummary"></p>
+    <p class="devHint">Gold, height, and spawned miners save to this world. Cheat switches reset on reload.</p>
+    <form id="devGoldForm"><label for="devGold">Give yourself gold</label><div class="devRow"><input id="devGold" type="number" min="0" max="1000000000" step="1" value="1000" required><button class="btn" type="submit">ADD GOLD</button></div></form>
+    <form id="devHeightForm"><label for="devHeight">Set height record (m)</label><div class="devRow"><input id="devHeight" type="number" min="0" max="10000" step="1" value="100" required><button class="btn" type="submit">SET HEIGHT</button></div><p class="devHint">Updates height unlocks and building size. Your actual tower stays where it is.</p></form>
+    <label class="devCheck"><input id="devOneHit" type="checkbox"><span>One-hit mining<small>Break any block, including buried blocks and bedrock. Miners also break their targets in one hit.</small></span></label>
+    <label class="devCheck"><input id="devInfinite" type="checkbox"><span>Unlimited miners<small>Place freely from the miner toolbar, even before 20 m.</small></span></label>
+    <div class="devRow"><label for="devLevel">Miner level</label><select id="devLevel"><option value="1">1 · Dirt</option><option value="2">2 · Stone</option><option value="3" selected>3 · Deepslate</option></select></div>
+    <div class="devActions"><button class="btn" id="devSpawn">SPAWN 1 HERE</button><button class="btn" id="devSpawnTen">SPAWN 10 HERE</button><button class="btn" id="devPlace">PLACE WITH TAP</button></div>
+    <p class="devHint">Spawn near the camera, or choose placement and tap the world. There is no total miner cap.</p>
+    <p id="devFeedback" role="status" aria-live="polite"></p>`;
+  document.body.append(panel);
+  const feedback=text=>{$('devFeedback').textContent=text};
+  const open=()=>{if(panel.open)return;ui();$('devHeight').value=best;panel.showModal()};
+  button.onclick=open;$('devClose').onclick=()=>panel.close();
+  panel.addEventListener('close',()=>button.focus());
+  panel.addEventListener('pointerdown',e=>e.stopPropagation());
+  panel.addEventListener('touchmove',e=>e.stopPropagation(),{passive:true});
+  document.addEventListener('keydown',e=>{if(e.key==='F2'){e.preventDefault();panel.open?panel.close():open()}});
+  $('devGoldForm').onsubmit=e=>{e.preventDefault();feedback(devGoldV30($('devGold').value)?'Gold added.':'Enter an amount from 0 to 1,000,000,000.')};
+  $('devHeightForm').onsubmit=e=>{e.preventDefault();feedback(devHeightV30($('devHeight').value)?'Height record updated.':'Enter a height from 0 to 10,000 m.')};
+  $('devOneHit').onchange=e=>{devToolsV30.oneHit=e.target.checked;feedback(devToolsV30.oneHit?'One-hit mining enabled.':'Normal mining restored.')};
+  $('devInfinite').onchange=e=>{devToolsV30.infiniteMiners=e.target.checked;ui();feedback(devToolsV30.infiniteMiners?'Unlimited miner placement enabled.':'Normal miner limits restored.')};
+  $('devLevel').onchange=e=>{devToolsV30.level=Number(e.target.value)};
+  function spawn(count){
+    for(let i=0;i<count;i++)devSpawnV30({x:cam.x+(i-(count-1)/2)*B*.8,y:cam.y-B*2});
+    ui();saveGame();feedback('Spawned '+count+' level '+devToolsV30.level+' miner'+(count===1?'':'s')+' near the camera.')
+  }
+  $('devSpawn').onclick=()=>spawn(1);$('devSpawnTen').onclick=()=>spawn(10);
+  $('devPlace').onclick=()=>{
+    devToolsV30.infiniteMiners=true;$('devInfinite').checked=true;tool='miner';
+    document.querySelectorAll('.slot').forEach(s=>s.classList.toggle('sel',s.dataset.tool==='miner'));
+    ui();panel.close();toast('DEV: TAP TO PLACE UNLIMITED MINERS')
+  };
+}
+installDevPanelV30();

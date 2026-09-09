@@ -25,6 +25,10 @@ const gridUrl='game-v25-grid-toggle.txt?v=28';
 const zoomUrl='game-v26-zoom-input.txt?v=28';
 const minerUrl='game-v27-miner-ai-rhythm.txt?v=28';
 const resourceUrl='game-v28-resources-obsidian.txt?v=28';
+const liquidFeelUrl='game-v29-liquid-feel.txt?v=29';
+const devPanelUrl='game-v30-dev-panel.txt?v=30';
+const obsidianArtUrl='game-v31-obsidian-art.txt?v=31';
+const artDirectionUrl='game-v32-art-direction.txt?v=32';
 const tailUrl='game-v8-part3.txt?v=28';
 
 async function read(url){
@@ -49,9 +53,13 @@ async function read(url){
     const zoom=await read(zoomUrl);
     const miner=await read(minerUrl);
     const resources=await read(resourceUrl);
+    const liquidFeel=await read(liquidFeelUrl);
+    const devPanel=await read(devPanelUrl);
+    const obsidianArt=await read(obsidianArtUrl);
+    const artDirection=await read(artDirectionUrl);
     const marker='restoreDynamicState(initialSave);';
     if(!tail.includes(marker))throw new Error('v28 insertion marker missing');
-    tail=tail.replace(marker,camera+'\n'+grid+'\n'+zoom+'\n'+miner+'\n'+resources+'\n'+marker);
+    tail=tail.replace(marker,camera+'\n'+grid+'\n'+zoom+'\n'+miner+'\n'+resources+'\n'+liquidFeel+'\n'+devPanel+'\n'+obsidianArt+'\n'+artDirection+'\n'+marker);
 
     const src=core+'\n});\n'+liquid+'\n'+tail;
     (0,eval)(src);

@@ -11,6 +11,8 @@
   <link rel="stylesheet" href="style.css?v=7">
   <link rel="stylesheet" href="style-v25.css?v=25">
   <link rel="stylesheet" href="style-v28.css?v=28">
+  <link rel="stylesheet" href="style-v30-dev.css?v=30">
+  <link rel="stylesheet" href="style-v32-art.css?v=32">
 </head>
 <body>
 <div id="app">
@@ -43,27 +45,30 @@
   <button class="btn" id="gridToggle" aria-pressed="true">▦ GRID ON</button>
   <button class="btn" id="tipBtn">💡</button>
 
-  <div id="tips" class="box">
-    <b>💡 QUICK TIPS</b>
-    <p>✋ MOVE lets you drag around safely.</p>
-    <p>🤏 Pinch the game to zoom between 0.72× and 1.55×. TOP / DOWN return to 1×.</p>
-    <p>▦ GRID ON snaps builds to world cells. GRID OFF gives you free placement.</p>
-    <p>👷 Miners finish started blocks, navigate by level, and mine in rhythm with the song.</p>
-    <p>⛏ Tap exposed blocks to mine. Dark buried blocks must touch open space first.</p>
-    <p>💧 Dirt floats in water. Stone and deepslate sink.</p>
-    <p>🔥 Water touching lava cools into solid obsidian.</p>
-    <p>▲ TOP follows your highest build. ▼ DOWN follows your mine.</p>
-    <p>New height records must stay stable for 3 seconds before they count.</p>
-    <small>No spoilers — valuable things can be hidden where you least expect them.</small>
-    <div class="saveNote">💾 Your world saves automatically on this device.</div>
-    <div class="resetSection"><button class="resetLink" id="restartWorld">↻ RESTART WORLD</button></div>
+  <div id="tips" class="box" aria-label="Game guide">
+    <div class="tipsTitle"><b>FIELD GUIDE</b><small>Tap a section to open it</small></div>
+    <div class="tipsGroups">
+      <details open><summary>CONTROLS <span>Move, zoom, camera</span></summary><div class="tipBody">
+        <p><b>MOVE</b> drags around safely. Pinch to zoom.</p><p><b>TOP / DOWN</b> jump between your tower and mine.</p><p><b>GRID</b> switches between snapped and free placement.</p>
+      </div></details>
+      <details><summary>MINING &amp; BUILDING <span>Blocks, miners, records</span></summary><div class="tipBody">
+        <p>Tap exposed blocks to mine. Buried blocks must touch open space.</p><p>Miners finish started blocks and work in rhythm with the music.</p><p>Height records must stay stable for 3 seconds before they count.</p>
+      </div></details>
+      <details><summary>LIQUIDS &amp; SECRETS <span>Water, lava, discoveries</span></summary><div class="tipBody">
+        <p>Dirt floats in water. Stone and deepslate sink.</p><p>Water touching lava cools into solid obsidian.</p><p>No spoilers—valuable things can hide where you least expect them.</p>
+      </div></details>
+    </div>
+    <div class="tipsFooter"><div class="saveNote">YOUR WORLD SAVES AUTOMATICALLY</div><div class="tipsActions">
+      <button class="btn devLink" id="devToggle" title="Developer tools (F2)" aria-haspopup="dialog" aria-controls="devPanel">DEV TOOLS</button>
+      <button class="resetLink" id="restartWorld">RESTART WORLD</button>
+    </div></div>
   </div>
 
   <div id="bar">
     <button class="slot" data-tool="move"><span class="icon">✋</span><span>MOVE</span></button>
     <button class="slot sel" data-tool="pick"><span class="icon">⛏</span><span>PICK</span></button>
     <button class="slot empty" data-tool="dirt"><span class="blk dirt"><b class="num" id="dc">0</b></span><span>DIRT</span></button>
-    <button class="slot locked" data-tool="stone" id="stoneSlot"><span class="blk stone"><b class="num" id="sc">0</b><i class="lock">🔒</i></span><span>STONE</span></button>
+    <button class="slot locked" data-tool="stone" id="stoneSlot"><span class="blk stone"><b class="num" id="sc">0</b><i class="lock">×</i></span><span>STONE</span></button>
     <button class="slot locked" data-tool="deepslate" id="deepSlot"><span class="blk deepslate"><b class="num" id="dsc">0</b><i class="lock">?</i></span><span>DEEP</span></button>
     <button class="slot locked" data-tool="miner" id="minerSlot">
       <span class="minerToolIcon">👷<b class="minerCount" id="mc">0</b><i class="lock">20m</i></span>
@@ -91,7 +96,7 @@
   <div id="toast" class="hide"></div><div id="load">Loading physics…</div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/matter-js@0.20.0/build/matter.min.js"></script>
-<script src="audio.js?v=5"></script>
-<script src="game-v28.js?v=28"></script>
+<script src="audio.js?v=35"></script>
+<script src="game-v28.js?v=33"></script>
 </body>
 </html>

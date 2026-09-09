@@ -1,0 +1,36 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sky Stack · Pixel art collection</title>
+<style>body{margin:0;background:#202332;color:#eee2df;font:14px monospace}main{max-width:1024px;margin:24px auto;padding:20px}h1{font-size:25px;color:#f2d59f}p{color:#beadc8;line-height:1.7}canvas{display:block;width:100%;height:auto;image-rendering:pixelated;border:2px solid #796080}a{color:#efd5a4}</style>
+<main><h1>Sky Stack · The pixel art collection</h1><p>Every terrain material, the three miner tiers, and the new tool sprites. All drawn with the game’s actual rendering code.</p><canvas id="art" width="1000" height="610" aria-label="Five textured block materials, three miner levels, and custom pixel tools"></canvas><p><a href="../">Play Sky Stack ↗</a> · <a href="liquids.html">Liquid playground ↗</a></p></main>
+<script>
+var ctx=document.getElementById('art').getContext('2d'),B=32,W=1000,HH=610,cam={z:2};
+var M={dirt:{},stone:{},deepslate:{},bedrock:{},obsidian:{col:[]}},w2s=(x,y)=>({x,y}),terrainExposed=z=>!z.buried;
+var draw=()=>{},cracks=()=>{},bg=()=>{},drawMiner,drawGoldBursts,preview;
+(async()=>{
+ for(const name of ['game-v31-obsidian-art.txt','game-v32-art-direction.txt']){let t=await (await fetch('../'+name)).text();if(name.includes('v32'))t=t.slice(0,t.indexOf('function installArtUiV32'));(0,eval)(t)}
+ const icons=['move','pick','lamp'].map(name=>{const image=new Image();image.src=artIconV32(name);return image});
+ function frame(now){
+ ctx.fillStyle='#202332';ctx.fillRect(0,0,W,HH);ctx.font='bold 15px monospace';
+ const materials=['dirt','stone','deepslate','bedrock','obsidian'];
+ for(let i=0;i<5;i++){
+  const x=100+i*200;ctx.fillStyle='#e8cba7';ctx.fillText(materials[i].toUpperCase(),x-43,34);
+  for(let y=0;y<3;y++){
+   draw({position:{x,y:90+y*82},angle:0,buried:y===1,game:{material:materials[i],w:31,h:31,cx:i,cy:30+y,terrain:true,max:materials[i]==='bedrock'?Infinity:10,hits:y===2?5:0}});
+  }
+ }
+ ctx.font='12px monospace';ctx.fillStyle='#b6a8bf';ctx.fillText('Exposed / buried / damaged',30,307);
+ ctx.fillStyle='#39334a';ctx.fillRect(24,330,952,2);
+ for(let i=0;i<3;i++){
+  ctx.save();ctx.translate(115+i*175,362);ctx.scale(2.5,2.5);artMinerV32(ctx,i+1,Math.floor(now/220)%2,true);ctx.restore();
+  ctx.fillStyle='#e3d3df';ctx.fillText('LEVEL '+(i+1),125+i*175,467);
+ }
+ for(const [i,name] of ['move','pick','lamp'].entries()){
+  const image=icons[i];
+  if(image.complete){ctx.imageSmoothingEnabled=false;ctx.drawImage(image,660+i*100,375,64,64)}
+  ctx.fillStyle='#e3d3df';ctx.fillText(name.toUpperCase(),670+i*100,467);
+ }
+ ctx.fillStyle='#b6a8bf';ctx.fillText('Hand-drawn pixel silhouettes · chipped edges · distinct material palettes',30,535);
+ ctx.fillText('The UI, effects, scenery, build previews, and liquids share this treatment.',30,559);
+ requestAnimationFrame(frame)
+ }requestAnimationFrame(frame)
+})().catch(e=>{console.error(e);document.querySelector('p').textContent=e.message});
+</script></html>

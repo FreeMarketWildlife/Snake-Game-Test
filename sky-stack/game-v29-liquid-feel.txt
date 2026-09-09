@@ -1,0 +1,166 @@
+// v29: fixed-step, conservative flow and a single pixel-art liquid layer.
+// Keep v22's subcell/save format and v28's terrain obsidian reactions.
+SKY_BUILD='v29';
+var liquidClockV29=null,liquidAccumulatorV29=0,liquidStepsV29=0;
+var liquidCanvasV29=null,liquidContextV29=null;
+
+function liquidTransferV29(src,x,y,amount,now){
+  if(amount<=1e-9||!liquidSubOpenV22(x,y))return 0;
+  const dst=liquidSubRecV22(x,y);
+  if(dst&&dst.kind!==src.kind)return 0;
+  amount=Math.min(src.a,amount);if(amount<=1e-9)return 0;
+  src.a-=amount;
+  if(dst)dst.a+=amount;
+  else liquidSubV22.set(liquidSubKeyV22(x,y),{x,y,kind:src.kind,a:amount});
+  liquidMarkFlowV22(src,x,y,amount,now);
+  if(src.a<=1e-12)liquidSubV22.delete(liquidSubKeyV22(src.x,src.y));
+  return amount
+}
+
+liquidStepSubV22=function(kind,now){
+  liquidV22Init();
+  const center=cam.x/liquidSBV22(),range=24*liquidSubScaleV22*3.15;
+  const active=()=>[...liquidSubV22.values()].filter(r=>r.kind===kind&&Math.abs(r.x-center)<=range&&liquidSubOpenV22(r.x,r.y));
+  const lava=kind==='lava',compress=lava?.012:.025;
+  // Bottom first: incoming liquid cannot cascade through many cells in one tick.
+  for(const r of active().sort((a,b)=>b.y-a.y||a.x-b.x)){
+    const b=liquidSubRecV22(r.x,r.y+1);
+    if(b&&b.kind!==kind)continue;
+    const mass=b?b.a:0,total=r.a+mass;
+    const target=total<=1?1:total<2+compress?(1+total*compress)/(1+compress):(total+compress)/2;
+    liquidTransferV29(r,r.x,r.y+1,Math.min(lava?.24:.95,Math.max(0,target-mass)),now)
+  }
+  // Disjoint pairs equalize once per pass, with alternating parity to avoid bias.
+  // Unsupported water falls in a column; it spreads once it reaches a pool/floor.
+  for(let pass=0;pass<2;pass++){
+    const pairs=new Set(),parity=(liquidStepsV29+pass)&1;
+    for(const r of active()){
+      const x=((r.x&1)===parity)?r.x:r.x-1,k=liquidSubKeyV22(x,r.y);
+      if(pairs.has(k))continue;pairs.add(k);
+      if(!liquidSubOpenV22(x,r.y)||!liquidSubOpenV22(x+1,r.y))continue;
+      const a=liquidSubRecV22(x,r.y),b=liquidSubRecV22(x+1,r.y);
+      if((a&&a.kind!==kind)||(b&&b.kind!==kind))continue;
+      const diff=(a?a.a:0)-(b?b.a:0),src=diff>0?a:b;if(!src)continue;
+      const below=liquidSubRecV22(src.x,src.y+1);
+      if(liquidSubOpenV22(src.x,src.y+1)&&(!below||(below.kind===kind&&below.a<.98)))continue;
+      liquidTransferV29(src,diff>0?x+1:x,r.y,Math.abs(diff)*(lava?.13:.48),now)
+    }
+  }
+  // Small compression lets connected vessels level through submerged passages.
+  for(const r of active().sort((a,b)=>a.y-b.y||a.x-b.x)){
+    const up=liquidSubRecV22(r.x,r.y-1);if(up&&up.kind!==kind)continue;
+    const um=up?up.a:0,total=r.a+um;
+    const target=total<=1?1:total<2+compress?(1+total*compress)/(1+compress):(total+compress)/2;
+    liquidTransferV29(r,r.x,r.y-1,Math.min(lava?.06:.3,Math.max(0,r.a-target)*.5),now)
+  }
+};
+
+updateLiquids=function(now){
+  liquidV22Init();
+  if(!Number.isFinite(now))return;
+  if(liquidClockV29===null){liquidClockV29=now;return}
+  // Ignore time spent in a hidden tab, and bound catch-up work after a stall.
+  const elapsed=now-liquidClockV29;liquidClockV29=now;
+  if(elapsed<0||elapsed>250){liquidAccumulatorV29=0;return}
+  liquidAccumulatorV29+=elapsed;
+  const step=1000/60;
+  while(liquidAccumulatorV29+1e-7>=step){
+    liquidAccumulatorV29-=step;liquidStepsV29++;liquidSubTickV22++;
+    const t=now-liquidAccumulatorV29;
+    liquidStepSubV22('water',t);
+    if(liquidStepsV29%3===0)liquidStepSubV22('lava',t);
+    liquidReactV22(t);
+    if(liquidStepsV29%2===0)updateBuoyancyV22();
+    if(liquidStepsV29%120===0){
+      // Do not evaporate shallow films: all positive volume stays in the solver.
+      for(const [k,r] of liquidSubV22)if(!Number.isFinite(r.a)||r.a<=0)liquidSubV22.delete(k);
+      for(const [k,q] of liquidSubFlowV22)if(t-q.last>900)liquidSubFlowV22.delete(k);
+      for(const [k,q] of liquidSubImpactV22)if(t-q.last>1000)liquidSubImpactV22.delete(k);
+      for(const k of liquidSubVisualV22.keys())if(!liquidSubV22.has(k.slice(k.indexOf(':')+1)))liquidSubVisualV22.delete(k)
+    }
+  }
+};
+
+function liquidGeometryV29(r,now){
+  const sb=liquidSBV22(),above=liquidSubRecV22(r.x,r.y-1),below=liquidSubRecV22(r.x,r.y+1);
+  const joined=above&&above.kind===r.kind&&above.a>.01;
+  const falling=liquidSubOpenV22(r.x,r.y+1)&&(!below||(below.kind===r.kind&&below.a<.92));
+  let a=liquidVisualAmountV22(r,now),top=(r.y+1-a)*sb,left=r.x*sb,width=sb;
+  if(falling){
+    const flow=liquidFlowAtV22(r.x,r.y,r.kind,now);
+    width=Math.max(2,Math.min(sb,sb*Math.sqrt(Math.max(r.a,flow?.mag||0))));
+    // Straight, connected columns instead of diagonal, sine-wobbling ribbons.
+    left+=(sb-width)/2;
+    // A trace left behind by a receding pool is a shallow film, not a tall spike.
+    top=r.a<.04&&!joined?(r.y+1-Math.sqrt(r.a))*sb:r.y*sb;
+  }else if(joined)top=r.y*sb;
+  else{
+    let ripple=0;
+    for(let dx=-3;dx<=3;dx++){
+      const impact=liquidImpactAtV22(r.x+dx,r.y,r.kind,now);
+      ripple+=Math.sin(now*.014-Math.abs(dx)*1.5)*impact*(1-Math.abs(dx)/4)
+    }
+    top+=clamp(ripple,-1,1)*(r.kind==='lava'?.6:1.5);
+    top=clamp(top,r.y*sb,(r.y+1)*sb-1);
+  }
+  return{left,top,width,bottom:(r.y+1)*sb,surface:!joined&&!falling,falling}
+}
+
+drawMappedLiquids=function(now){
+  liquidV22Init();
+  const pixel=2,sb=liquidSBV22(),left=Math.floor((cam.x-W/(2*cam.z))/pixel)*pixel;
+  const top=Math.floor((cam.y-HH/(2*cam.z))/pixel)*pixel;
+  const width=Math.ceil(W/cam.z/pixel)+2,height=Math.ceil(HH/cam.z/pixel)+2;
+  if(!liquidCanvasV29){liquidCanvasV29=document.createElement('canvas');liquidContextV29=liquidCanvasV29.getContext('2d')}
+  if(liquidCanvasV29.width!==width||liquidCanvasV29.height!==height){liquidCanvasV29.width=width;liquidCanvasV29.height=height}
+  const g=liquidContextV29;g.clearRect(0,0,width,height);
+  const visible=[];
+  for(const r of liquidSubV22.values()){
+    if(r.a<.006||!liquidSubOpenV22(r.x,r.y)||r.x*sb>left+width*pixel||r.x*sb+sb<left||r.y*sb>top+height*pixel||r.y*sb+sb<top)continue;
+    visible.push({r,shape:liquidGeometryV29(r,now)})
+  }
+  const rect=(x,y,w,h,color)=>{g.fillStyle=color;const px=Math.round((x-left)/pixel),py=Math.round((y-top)/pixel);g.fillRect(px,py,Math.max(1,Math.round((x+w-left)/pixel)-px),Math.max(1,Math.round((y+h-top)/pixel)-py))};
+  const shapes=new Map(visible.map(q=>[liquidSubKeyV22(q.r.x,q.r.y),q]));
+  function surfaceY(r,s,x){
+    const dx=x<s.left+sb/2?-1:1,neighbor=shapes.get(liquidSubKeyV22(r.x+dx,r.y));
+    if(!neighbor||neighbor.r.kind!==r.kind||!neighbor.shape.surface)return s.top;
+    return s.top+(neighbor.shape.top-s.top)*Math.abs(x-(s.left+sb/2))/sb
+  }
+  // Opaque offscreen shapes, composited once: no dark overlaps or tile seams.
+  for(const {r,shape:s} of visible){
+    let depth=0;
+    for(let dy=1;dy<=8;dy++){const above=liquidSubRecV22(r.x,r.y-dy);if(!above||above.kind!==r.kind||above.a<.05)break;depth+=clamp(above.a,0,1)}
+    const shade=Math.min(1,depth/8),lava=r.kind==='lava';
+    const color=lava?`rgb(${Math.round(242-shade*43)},${Math.round(103-shade*49)},${Math.round(38-shade*9)})`:`rgb(${Math.round(48-shade*22)},${Math.round(151-shade*51)},${Math.round(184-shade*36)})`;
+    if(s.surface){for(let x=s.left;x<s.left+s.width;x+=pixel){const y=surfaceY(r,s,x+pixel/2);rect(x,y,pixel,s.bottom-y,color)}}
+    else rect(s.left,s.top,s.width,s.bottom-s.top,color);
+  }
+  for(const {r,shape:s} of visible){
+    const lava=r.kind==='lava',x=s.left,y=s.top;
+    if(s.surface){
+      for(let px=x;px<x+s.width;px+=pixel){
+        const sy=surfaceY(r,s,px+pixel/2);
+        rect(px,sy,pixel,2,lava?'#ffd269':'#b5e8df');
+        if(s.bottom-sy>5)rect(px,sy+2,pixel,2,lava?'#ff963c':'#66c1ca');
+      }
+      // Sparse, slowly travelling glints/crust, snapped to the world's pixel grid.
+      const phase=((r.x*13+Math.floor(now/(lava?340:150)))%23+23)%23;
+      if(phase<5&&s.bottom-y>7)rect(x+phase*2,y+4,Math.min(6,s.width-phase*2),2,lava?'#af3925':'#65c7e1');
+    }else if(s.falling){
+      const phase=((now*(lava?.012:.055)+r.y*3)%sb+sb)%sb;
+      rect(x+Math.floor(s.width/4),r.y*sb+phase,Math.max(2,s.width/5),Math.min(4,sb-phase),lava?'#ffad49':'#75cfe5');
+    }
+    if(!s.falling){
+      const impact=liquidImpactAtV22(r.x,r.y,r.kind,now);
+      if(impact>.12&&s.surface){
+        const phase=(now/(lava?620:420)+r.x*.37)%1;
+        for(const sign of [-1,1])rect(x+sb/2+sign*phase*10,y-Math.sin(phase*Math.PI)*8*impact,2,2,lava?'#ffcf65':'#c5f2f5');
+      }
+    }
+  }
+  const screen=w2s(left,top);ctx.save();ctx.imageSmoothingEnabled=false;
+  ctx.globalAlpha=.86;ctx.drawImage(liquidCanvasV29,screen.x,screen.y,width*pixel*cam.z,height*pixel*cam.z);ctx.restore()
+};
+
+var liquidDebugBaseV29=window.__skyStackLiquidDebug;
+window.__skyStackLiquidDebug=()=>({...liquidDebugBaseV29(),build:'v29',fixedSteps:liquidStepsV29});
