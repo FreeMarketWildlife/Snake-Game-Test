@@ -178,7 +178,7 @@ function mine(p){
   z.game.hits++;z.game.flash=7;if(z.game.terrain)terrainDamage.set(key(z.game.cx,z.game.cy),z.game.hits);
   const broken=z.game.hits>=z.game.max;SkyAudio.hit(z.game.material,broken,z.game.hits);if(broken)harvest(z,'player');else saveSoon()
 }
-function mineableNear(q){const r=B*1.18,m=minerMaterial(q);return Query.region([...bs],{min:{x:q.position.x-r,y:q.position.y-r},max:{x:q.position.x+r,y:q.position.y+r}}).filter(z=>z.game?.terrain&&z.game.material===m&&terrainExposed(z))}
+function mineableNear(q){const r=B*1.18;return Query.region([...bs],{min:{x:q.position.x-r,y:q.position.y-r},max:{x:q.position.x+r,y:q.position.y+r}}).filter(z=>z.game?.terrain&&minerCanMineMaterial(q,z.game.material)&&terrainExposed(z))}
 
 function frontier(){
   const cx=cell(cam.x);let dug=false;

@@ -26,11 +26,13 @@ function ensureWorld(){const ch=Math.floor(cam.x/(24*B));for(let i=ch-2;i<=ch+2;
 ensureWorld();
 World.add(eng.world,Bodies.rectangle(0,(DEPTH+2)*B,1000000,B*2,{isStatic:true,label:'deep-floor'}));
 
+// Workers share narrow tunnels without forming a physics pileup.
+var minerCollisionGroupV38=Body.nextGroup(true);
 function createMinerAt(x,y,o={}){
-  const q=Bodies.rectangle(x,y,B*.66,B*.80,{density:.00125,friction:.88,frictionStatic:.95,restitution:.02,frictionAir:.025,chamfer:{radius:2},sleepThreshold:100});
+  const q=Bodies.rectangle(x,y,B*.66,B*.80,{inertia:Infinity,collisionFilter:{group:minerCollisionGroupV38},density:.00125,friction:.88,frictionStatic:.95,restitution:.02,frictionAir:.025,chamfer:{radius:2},sleepThreshold:100});
   const id=Math.max(1,Math.floor(o.id||++minerId));minerId=Math.max(minerId,id);
   q.game={kind:'miner',level:clamp(Math.floor(o.level||1),1,3),gold:Math.max(0,Math.floor(o.gold||0)),id,dir:o.dir===-1?-1:1,nextMine:performance.now()+700+Math.random()*300,nextTurn:performance.now()+800+Math.random()*1200,pickUntil:0,uprightSince:0};
-  if(o.angle)Body.setAngle(q,o.angle);if(o.velocity)Body.setVelocity(q,{x:finite(o.velocity.x),y:finite(o.velocity.y)});if(o.angularVelocity)Body.setAngularVelocity(q,finite(o.angularVelocity));
+  if(o.velocity)Body.setVelocity(q,{x:finite(o.velocity.x),y:finite(o.velocity.y)});
   miners.add(q);World.add(eng.world,q);return q
 }
 function ensureChunkAtX(x){const ch=Math.floor(x/(24*B));for(let i=ch-1;i<=ch+1;i++)gen(i)}

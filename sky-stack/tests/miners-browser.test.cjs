@@ -12,7 +12,7 @@ const {chromium}=require('playwright'),assert=require('node:assert/strict');
  await page.route('**/game-v8-part3.txt*',async route=>{
   const response=await route.fetch(),source=await response.text();
   const hook=`window.minerTest={B,bs,miners,grid,inv,eng,createMinerAt,minerAcquireTargetV27,minerCanHitV27,minerNavigateV27,
-    updateMiners,Engine,Body,Bodies,World,getExposure:()=>terrainExposed,setExposure:f=>terrainExposed=f,
+    updateMiners,openMinerMenu,closeMinerMenu,Engine,Body,Bodies,World,getExposure:()=>terrainExposed,setExposure:f=>terrainExposed=f,
     reset(){World.clear(eng.world,false);Engine.clear(eng);bs.clear();miners.clear();grid.clear();removedTerrain.clear();terrainDamage.clear();for(const k in inv)inv[k]=0},
     block(x,y,material='stone',terrain=true){const z=Bodies.rectangle(x,y,B,B,{isStatic:true});z.game={material,terrain,cx:Math.floor(x/B),cy:Math.floor(y/B),w:B,h:B,hits:0,max:material==='dirt'?1:material==='stone'?3:6};bs.add(z);grid.set(key(z.game.cx,z.game.cy),z);World.add(eng.world,z);return z}
   };`;
@@ -39,6 +39,15 @@ const {chromium}=require('playwright'),assert=require('node:assert/strict');
   step(480);check(!t.bs.has(stone)&&t.inv.stone>0,'miner waits and finishes a multi-hit stone block');
   reset();floor();const deep=t.block(16,48,'deepslate');q=t.createMinerAt(16,19,{level:3});
   step(720);check(!t.bs.has(deep)&&t.inv.deepslate>0,'level 3 completes deepslate on offbeats');
+  // Upgrade through the real menu while another material is already targeted.
+  for(const level of [2,3]){
+    reset();floor();const dirt=t.block(16,48,'dirt'),hard=t.block(48,16,level===2?'stone':'deepslate');
+    q=t.createMinerAt(16,19,{level:level-1});t.inv.gold=100;t.openMinerMenu(q);
+    document.getElementById('minerUpgrade').click();t.closeMinerMenu();
+    check(q.game.level===level,'menu upgrade reaches level '+level);
+    q.game.workTarget=hard;
+    step(5);check(!t.bs.has(dirt),'upgraded level '+level+' mines dirt on its next beat while harder work is nearby');
+  }
   // Wall between pick and target: do not mine through it.
   reset();const hidden=t.block(40,0,'dirt');t.block(8,0,'bedrock',false);q=t.createMinerAt(-20,0,{level:1});
   check(!t.minerCanHitV27(q,hidden),'pick cannot hit through solid geometry');
@@ -53,6 +62,18 @@ const {chromium}=require('playwright'),assert=require('node:assert/strict');
   const high=t.block(80,-16,'deepslate');q=t.createMinerAt(0,50,{level:3,dir:1});let climbed=false;
   for(let i=0;i<1500&&t.bs.has(high);i++){step(1);climbed ||= q.game.aiState==='climbing'}
   check(climbed,'level 3 uses wall climbing');check(!t.bs.has(high),'level 3 climbs a tall ledge and mines deepslate');
+  // Restored tilted miners and groups must fit through a one-cell tunnel.
+  reset();floor();for(let x=-16;x<=144;x+=32)t.block(x,16,'bedrock',false);
+  const tunnelDirt=t.block(112,48,'dirt'),workers=[];
+  for(let i=0;i<6;i++)workers.push(t.createMinerAt(16,50,{level:3,angle:Math.PI/2,angularVelocity:1,dir:1}));
+  check(workers.every(w=>w.angle===0&&w.inverseInertia===0),'restored miners stay upright in tight spaces');
+  check(workers[0].collisionFilter.group<0&&workers.every(w=>w.collisionFilter.group===workers[0].collisionFilter.group),'miners can pass each other without blocking tunnels');
+  step(600);check(workers.every(w=>Math.abs(w.angle)<.01),'miners remain upright after moving through the tunnel');check(!t.bs.has(tunnelDirt),'a group of upgraded miners gets through a low tunnel and mines dirt');
+  // Reaching work above an overhang requires first walking away from it.
+  reset();floor();for(const x of [16,48,80,112])t.block(x,16,'bedrock',false);
+  const roofDirt=t.block(80,-16,'dirt');q=t.createMinerAt(80,50,{level:2,dir:1});let detoured=false;
+  for(let i=0;i<1200&&t.bs.has(roofDirt);i++){step(1);detoured ||= Math.abs(q.position.x-80)>48}
+  check(detoured&&!t.bs.has(roofDirt),'miner routes around an overhang and mines dirt above it');
   // A sealed unreachable target must eventually be released, without teleporting.
   reset();floor();for(let y=48;y>=-112;y-=32)t.block(48,y,'bedrock',false);
   const trapped=t.block(80,48,'dirt');q=t.createMinerAt(0,50,{level:1,dir:1});let released=false;

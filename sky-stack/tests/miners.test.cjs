@@ -42,3 +42,16 @@ s.bs.delete(dirt);assert.equal(s.minerAcquireTargetV27(q),null);
 rhythm={ready:false,beatIndex:-1};assert.equal(s.minerRhythmV27(2500).bpm,72);
 assert.equal(sounds,12);assert.equal(harvests,0);
 console.log('PASS cumulative miner levels, target eligibility, material rhythms, duplicate-frame prevention, upgrades, and silent fallback tempo');
+
+// Nearby harder work cannot consume dirt beats, and stone cannot consume the
+// following deepslate offbeat. Repeated frames still produce a single hit.
+{
+ const worker=miner(3),dirt=block('dirt'),stone=block('stone'),deep=block('deepslate');
+ s.bs.clear();s.miners.clear();[dirt,stone,deep].forEach(z=>s.bs.add(z));s.miners.add(worker);
+ worker.game.workTarget=deep;
+ for(const [beatIndex,phase] of [[0,0],[0,.05],[1,0],[1,.05],[1,.5],[1,.55]]){
+  rhythm={ready:true,bpm:72,beatMs:60000/72,beatIndex,phase};s.updateMiners(beatIndex*1000+phase*1000);
+ }
+ assert.deepEqual([dirt.game.hits,stone.game.hits,deep.game.hits],[1,1,1]);
+ console.log('PASS mixed-material work uses dirt, stone, and deepslate beats independently');
+}

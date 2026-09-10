@@ -3,11 +3,11 @@
 
 const coreParts=[
   'game-v8-part0.txt?v=28',
-  'game-v8-part1.txt?v=28',
+  'game-v8-part1.txt?v=38',
   'game-v8-part2.txt?v=36'
 ];
 const liquidParts=[
-  'game-v10-liquid.txt?v=28',
+  'game-v10-liquid.txt?v=38',
   'game-v10-liquid-fixes.txt?v=28',
   'game-v13-liquid-visibility.txt?v=28',
   'game-v14-liquid-guarantee.txt?v=28',
@@ -23,7 +23,7 @@ const liquidParts=[
 const cameraUrl='game-v24-camera-bounce.txt?v=28';
 const gridUrl='game-v25-grid-toggle.txt?v=28';
 const zoomUrl='game-v26-zoom-input.txt?v=28';
-const minerUrl='game-v27-miner-ai-rhythm.txt?v=37';
+const minerUrl='game-v27-miner-ai-rhythm.txt?v=38';
 const resourceUrl='game-v28-resources-obsidian.txt?v=36';
 const liquidFeelUrl='game-v29-liquid-feel.txt?v=29';
 const devPanelUrl='game-v30-dev-panel.txt?v=30';

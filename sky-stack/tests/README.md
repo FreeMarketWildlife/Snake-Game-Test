@@ -65,3 +65,9 @@ Optionally set `SKY_TEST_BROWSER` to an existing Chromium executable. This test
 loads the production bundle in an isolated browser context and exercises real
 Matter.js physics, harvesting, obstacle jumps, tall-wall climbing, unreachable
 target recovery, live music, and audio suspension without touching your saves.
+
+The v38 miner regressions also upgrade workers using the real menu beside mixed
+materials, route around an overhang, and run six workers through a low tunnel.
+Workers now select an eligible nearby material on each beat, plan routes between
+clear standing positions, and stay upright while passing one another. Both the
+main AI and the older nearby-mining helper retain lower-level material access.
