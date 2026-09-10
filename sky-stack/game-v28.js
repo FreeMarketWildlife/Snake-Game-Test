@@ -2,12 +2,12 @@
 'use strict';
 
 const coreParts=[
-  'game-v8-part0.txt?v=40',
-  'game-v8-part1.txt?v=40',
+  'game-v8-part0.txt?v=41',
+  'game-v8-part1.txt?v=41',
   'game-v8-part2.txt?v=36'
 ];
 const liquidParts=[
-  'game-v10-liquid.txt?v=40',
+  'game-v10-liquid.txt?v=41',
   'game-v10-liquid-fixes.txt?v=28',
   'game-v13-liquid-visibility.txt?v=28',
   'game-v14-liquid-guarantee.txt?v=28',
@@ -21,15 +21,16 @@ const liquidParts=[
   'game-v22-liquid-engine.txt?v=28'
 ];
 const cameraUrl='game-v24-camera-bounce.txt?v=28';
-const gridUrl='game-v25-grid-toggle.txt?v=28';
+const gridUrl='game-v25-grid-toggle.txt?v=41';
 const zoomUrl='game-v26-zoom-input.txt?v=28';
-const minerUrl='game-v27-miner-ai-rhythm.txt?v=38';
+const minerUrl='game-v27-miner-ai-rhythm.txt?v=41';
 const resourceUrl='game-v28-resources-obsidian.txt?v=36';
 const liquidFeelUrl='game-v29-liquid-feel.txt?v=29';
 const devPanelUrl='game-v30-dev-panel.txt?v=30';
 const obsidianArtUrl='game-v31-obsidian-art.txt?v=31';
-const artDirectionUrl='game-v32-art-direction.txt?v=40';
+const artDirectionUrl='game-v32-art-direction.txt?v=41';
 const pickaxeUrl='game-v39-pickaxe.txt?v=39';
+const treesUrl='game-v41-trees.txt?v=41';
 const tailUrl='game-v8-part3.txt?v=39';
 
 async function read(url){
@@ -59,9 +60,10 @@ async function read(url){
     const obsidianArt=await read(obsidianArtUrl);
     const artDirection=await read(artDirectionUrl);
     const pickaxe=await read(pickaxeUrl);
+    const trees=await read(treesUrl);
     const marker='restoreDynamicState(initialSave);';
     if(!tail.includes(marker))throw new Error('v28 insertion marker missing');
-    tail=tail.replace(marker,camera+'\n'+grid+'\n'+zoom+'\n'+miner+'\n'+resources+'\n'+liquidFeel+'\n'+devPanel+'\n'+obsidianArt+'\n'+artDirection+'\n'+pickaxe+'\n'+marker);
+    tail=tail.replace(marker,camera+'\n'+grid+'\n'+zoom+'\n'+miner+'\n'+resources+'\n'+liquidFeel+'\n'+devPanel+'\n'+obsidianArt+'\n'+artDirection+'\n'+pickaxe+'\n'+trees+'\n'+marker);
 
     const src=core+'\n});\n'+liquid+'\n'+tail;
     (0,eval)(src);

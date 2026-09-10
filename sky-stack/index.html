@@ -14,6 +14,7 @@
   <link rel="stylesheet" href="style-v30-dev.css?v=30">
   <link rel="stylesheet" href="style-v32-art.css?v=32">
   <link rel="stylesheet" href="style-v39-pickaxe.css?v=39">
+  <link rel="stylesheet" href="style-v41-trees.css?v=41">
 </head>
 <body>
 <div id="app">
@@ -55,6 +56,9 @@
       <details><summary>MINING &amp; BUILDING <span>Blocks, miners, records</span></summary><div class="tipBody">
         <p>Tap exposed blocks to mine. Buried blocks must touch open space.</p><p>Upgrade your pick for permanent drag mining: Iron 2×2 costs 5 gold, Steel 3×3 costs 20, and Titanium 4×4 costs 50. Drag or hold after starting a stroke to keep swinging. Use MOVE to pan.</p><p>Miners prioritize blocks within reach, jump and climb toward work, and back away when stuck. They keep earlier mining abilities when upgraded: level 1 mines dirt, level 2 adds stone, and level 3 adds deepslate. Dirt hits on beats 1 and 3; stone on 2 and 4; deepslate on the “and” after 2 and 4.</p><p>Height records must stay stable for 3 seconds before they count.</p>
       </div></details>
+      <details><summary>TREES <span>Wood, leaves, falling trunks</span></summary><div class="tipBody">
+        <p>Wood takes two hits to chop. Every trunk block above the cut falls with gravity; you can mine the fallen logs too.</p><p>Unsupported leaves disappear in 1–2 seconds. Mine them first to collect leaf blocks.</p><p>Use WOOD and LEAVES in the toolbar to build. Placed leaf blocks stay put. On phones, swipe the toolbar to see every material.</p>
+      </div></details>
       <details><summary>LIQUIDS &amp; SECRETS <span>Water, lava, discoveries</span></summary><div class="tipBody">
         <p>Dirt floats in water. Stone and deepslate sink.</p><p>Water touching lava cools into solid obsidian.</p><p>No spoilers—valuable things can hide where you least expect them.</p>
       </div></details>
@@ -70,6 +74,8 @@
     <button class="slot" data-tool="move"><span class="icon">✋</span><span>MOVE</span></button>
     <button class="slot sel" data-tool="pick"><span class="icon">⛏</span><span id="pickaxeLabel">STONE 1×1</span></button>
     <button class="slot empty" data-tool="dirt"><span class="blk dirt"><b class="num" id="dc">0</b></span><span>DIRT</span></button>
+    <button class="slot empty" data-tool="wood" aria-label="Wood blocks"><span class="blk wood"><b class="num" id="woodCount">0</b></span><span>WOOD</span></button>
+    <button class="slot empty" data-tool="leaves" aria-label="Leaf blocks"><span class="blk leaves"><b class="num" id="leavesCount">0</b></span><span>LEAVES</span></button>
     <button class="slot locked" data-tool="stone" id="stoneSlot"><span class="blk stone"><b class="num" id="sc">0</b><i class="lock">×</i></span><span>STONE</span></button>
     <button class="slot locked" data-tool="deepslate" id="deepSlot"><span class="blk deepslate"><b class="num" id="dsc">0</b><i class="lock">?</i></span><span>DEEP</span></button>
     <button class="slot locked" data-tool="obsidian" id="obsidianSlot"><span class="blk obsidian"><b class="num" id="oc">0</b><i class="lock">?</i></span><span>OBSIDIAN</span></button>
@@ -107,6 +113,6 @@
 </div>
 <script src="https://cdn.jsdelivr.net/npm/matter-js@0.20.0/build/matter.min.js"></script>
 <script src="audio.js?v=37"></script>
-<script src="game-v28.js?v=39"></script>
+<script src="game-v28.js?v=41"></script>
 </body>
 </html>

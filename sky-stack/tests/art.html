@@ -3,7 +3,7 @@
 <main><h1>Sky Stack · The pixel art collection</h1><p>Every terrain material, the three miner tiers, and the new tool sprites. All drawn with the game’s actual rendering code.</p><canvas id="art" width="1000" height="610" aria-label="Five textured block materials, three miner levels, and custom pixel tools"></canvas><p><a href="../">Play Sky Stack ↗</a> · <a href="liquids.html">Liquid playground ↗</a></p></main>
 <script>
 var ctx=document.getElementById('art').getContext('2d'),B=32,W=1000,HH=610,cam={z:2};
-var M={dirt:{},stone:{},deepslate:{},bedrock:{},obsidian:{col:[]}},w2s=(x,y)=>({x,y}),terrainExposed=z=>!z.buried;
+var pickaxeTier=0,M={dirt:{},wood:{},leaves:{},stone:{},deepslate:{},bedrock:{},obsidian:{col:[]}},w2s=(x,y)=>({x,y}),terrainExposed=z=>!z.buried;
 var draw=()=>{},cracks=()=>{},bg=()=>{},drawMiner,drawGoldBursts,preview;
 (async()=>{
  for(const name of ['game-v31-obsidian-art.txt','game-v32-art-direction.txt']){let t=await (await fetch('../'+name)).text();if(name.includes('v32'))t=t.slice(0,t.indexOf('function installArtUiV32'));(0,eval)(t)}

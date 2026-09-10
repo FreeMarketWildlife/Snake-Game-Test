@@ -1,0 +1,117 @@
+// Narrow, persistent surface trees. Natural blocks are separate from building
+// records, so standing trees and fallen logs never earn tower-height rewards.
+var treeChunksV41=new Set(),treeBlocksV41=new Set(),treeReadyV41=false,treeLastTickV41=null;
+
+function makeTreeBlockV41(cx,cy,material,treeId,options={}){
+  const attached=options.attached!==false;
+  const z=mk(options.x??ctr(cx),options.y??ctr(cy),material,{
+    static:false,w:B-1,h:B-1,hits:options.hits||0,
+    angle:options.angle||0,velocity:options.velocity,angularVelocity:options.angularVelocity
+  });
+  Object.assign(z.game,{naturalTree:true,treeId,treeCx:cx,treeCy:cy,attached,
+    decay:material==='leaves'&&Number.isFinite(options.decay)?Math.max(0,options.decay):null});
+  // Capture finite mass/inertia before freezing. Bodies created static can lose
+  // their dynamic mass during Matter's initialization and cannot fall correctly.
+  if(material==='leaves'||attached)Body.setStatic(z,true);
+  // Canopies can be picked, but characters and falling logs pass through foliage.
+  z.isSensor=material==='leaves';treeBlocksV41.add(z);return z
+}
+function plantTreeV41(cx,height){
+  const treeId='tree:'+cx;
+  for(let i=1;i<=height;i++)makeTreeBlockV41(cx,-i,'wood',treeId);
+  for(let i=1;i<=2;i++)makeTreeBlockV41(cx,-height-i,'leaves',treeId);
+  return treeId
+}
+function seedTreeChunkV41(ch){
+  if(treeChunksV41.has(ch))return;treeChunksV41.add(ch);
+  for(let slot=0;slot<3;slot++){
+    const cx=ch*24+3+slot*8+Math.floor(hash01(ch,slot,411)*3);
+    const ground=grid.get(key(cx,0));if(!ground?.game?.terrain||ground.game.material!=='dirt')continue;
+    const height=3+Math.floor(hash01(cx,0,412)*3);
+    const occupied=Query.region([...bs],{min:{x:cx*B,y:-(height+2)*B},max:{x:(cx+1)*B,y:-1}});
+    if(occupied.length)continue;plantTreeV41(cx,height)
+  }
+}
+function updateTreeSupportsV41(){
+  const groups=new Map();
+  for(const z of treeBlocksV41){
+    if(!bs.has(z)){treeBlocksV41.delete(z);continue}
+    const id=z.game.treeId;if(!groups.has(id))groups.set(id,[]);groups.get(id).push(z)
+  }
+  for(const blocks of groups.values()){
+    const wood=blocks.filter(z=>z.game.material==='wood'&&z.game.attached).sort((a,b)=>b.game.treeCy-a.game.treeCy);
+    const cx=blocks[0].game.treeCx;
+    let expected=-1,supported=!!grid.get(key(cx,0)),cut=false;
+    for(const z of wood){
+      if(z.game.treeCy!==expected)supported=false;expected=z.game.treeCy-1;
+      if(supported)continue;
+      cut=true;z.game.attached=false;Body.setStatic(z,false);Sleeping.set(z,false);
+      const dir=hash01(cx,0,413)<.5?-1:1;
+      Body.setVelocity(z,{x:dir*(.55+Math.abs(z.game.treeCy)*.08),y:.2});
+      Body.setAngularVelocity(z,dir*.065)
+    }
+    // A missing top log also disconnects the canopy, even if a stump remains.
+    const leaves=blocks.filter(z=>z.game.material==='leaves');
+    const canopyBase=leaves.length?Math.max(...leaves.map(z=>z.game.treeCy))+1:null;
+    const canopyAttached=wood.some(z=>z.game.attached&&z.game.treeCy===canopyBase);
+    if(cut||!canopyAttached)for(const z of leaves)if(z.game.decay===null){
+      z.game.decay=1000+hash01(cx,z.game.treeCy,414)*1000
+    }
+  }
+}
+function updateTreesV41(now){
+  if(!treeReadyV41)return;
+  const dt=treeLastTickV41===null?0:clamp(now-treeLastTickV41,0,250);treeLastTickV41=now;
+  updateTreeSupportsV41();let changed=false;
+  for(const z of treeBlocksV41){
+    if(z.game.decay===null)continue;z.game.decay-=dt;
+    if(z.game.decay<=0){treeBlocksV41.delete(z);bs.delete(z);World.remove(eng.world,z);changed=true}
+  }
+  if(changed)saveSoon()
+}
+function saveTreesV41(){
+  if(!treeReadyV41)return initialSave?.treesV41;
+  return{chunks:[...treeChunksV41],blocks:[...treeBlocksV41].filter(z=>bs.has(z)).map(z=>({
+    cx:z.game.treeCx,cy:z.game.treeCy,material:z.game.material,treeId:z.game.treeId,
+    attached:z.game.attached,decay:z.game.decay,hits:z.game.hits,
+    x:z.position.x,y:z.position.y,angle:z.angle,vx:z.velocity.x,vy:z.velocity.y,av:z.angularVelocity
+  }))}
+}
+var treeBaseGenV41=gen;
+gen=function(ch){treeBaseGenV41(ch);if(treeReadyV41)seedTreeChunkV41(ch)};
+var treeBaseRestoreV41=restoreDynamicState;
+restoreDynamicState=function(s){
+  treeBaseRestoreV41(s);
+  for(const ch of s?.treesV41?.chunks||[])if(Number.isInteger(ch))treeChunksV41.add(ch);
+  for(const r of s?.treesV41?.blocks||[]){
+    if(!Number.isInteger(r.cx)||!Number.isInteger(r.cy)||!['wood','leaves'].includes(r.material))continue;
+    makeTreeBlockV41(r.cx,r.cy,r.material,'tree:'+r.cx,{
+      attached:r.attached!==false,decay:r.decay,hits:Math.max(0,finite(r.hits)),
+      x:finite(r.x),y:finite(r.y),angle:finite(r.angle),
+      velocity:{x:finite(r.vx),y:finite(r.vy)},angularVelocity:finite(r.av)
+    })
+  }
+  treeReadyV41=true;for(const ch of generated)seedTreeChunkV41(ch);updateTreeSupportsV41()
+};
+var treeBaseHarvestV41=harvest;
+harvest=function(z,collector='player',worker=null){
+  const result=treeBaseHarvestV41(z,collector,worker);
+  if(z?.game?.naturalTree)treeBlocksV41.delete(z);
+  if(treeReadyV41)updateTreeSupportsV41();return result
+};
+var treeBaseUpdateMinersV41=updateMiners;
+updateMiners=function(now){updateTreesV41(now);treeBaseUpdateMinersV41(now)};
+var treeBaseDrawV41=draw;
+draw=function(z){
+  if(z.game?.naturalTree&&z.game.decay!==null){ctx.save();ctx.globalAlpha=clamp(z.game.decay/800,0,1);treeBaseDrawV41(z);ctx.restore()}
+  else treeBaseDrawV41(z)
+};
+var treeBaseUiV41=ui;
+ui=function(){
+  treeBaseUiV41();for(const material of ['wood','leaves']){
+    $(material+'Count').textContent=inv[material];document.querySelector('[data-tool='+material+']').classList.toggle('empty',!inv[material])
+  }
+};
+window.__skyStackTreeDebug=()=>({chunks:treeChunksV41.size,blocks:[...treeBlocksV41].filter(z=>bs.has(z)).map(z=>({
+  tree:z.game.treeId,material:z.game.material,attached:z.game.attached,decay:z.game.decay,x:z.position.x,y:z.position.y
+})),wood:inv.wood,leaves:inv.leaves});

@@ -39,7 +39,7 @@ function worldPlacementStateV25(r){
   };
   const hits=Query.region([...bs],region).filter(z=>z.game&&!z.game.liquid&&!z.game.reservoir);
   return{
-    terrain:hits.some(z=>z.game.terrain),
+    terrain:hits.some(z=>z.game.terrain||z.game.naturalTree),
     placed:hits.some(z=>z.game.placed)
   }
 }

@@ -1,0 +1,5 @@
+/* Keep every material reachable on phones without shrinking the touch targets. */
+@media(max-width:600px){
+ #bar{justify-content:flex-start;overflow-x:auto;overflow-y:hidden;touch-action:pan-x;overscroll-behavior-x:contain;padding-left:7px;padding-right:7px;scrollbar-width:thin;scrollbar-color:#b19aba #252534}
+ #bar .slot{flex:0 0 54px;min-width:54px;max-width:54px}
+}

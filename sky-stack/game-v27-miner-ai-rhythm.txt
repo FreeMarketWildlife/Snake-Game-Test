@@ -56,7 +56,7 @@ function minerAcquireTargetV27(q,now=performance.now(),rhythm=minerRhythmV27(now
   const g=q.game,range=minerSearchRangeV27(q);
   if(!g.avoidedTargets||g.aiLevel!==g.level){g.avoidedTargets=new Map();g.route=[];g.routeCheckAt=0;g.aiLevel=g.level}
   for(const [z,until] of g.avoidedTargets)if(now>=until||!bs.has(z))g.avoidedTargets.delete(z);
-  const solids=g.nearbySolids||Query.region([...bs],{min:{x:q.position.x-range,y:q.position.y-range},max:{x:q.position.x+range,y:q.position.y+range}}).filter(z=>z.game&&!z.game.liquid&&!z.game.reservoir);
+  const solids=g.nearbySolids||Query.region([...bs],{min:{x:q.position.x-range,y:q.position.y-range},max:{x:q.position.x+range,y:q.position.y+range}}).filter(z=>z.game&&!z.isSensor&&!z.game.liquid&&!z.game.reservoir);
   const candidates=solids.filter(z=>minerTargetValidV27(q,z));
   const reachable=candidates.filter(z=>minerCanHitV27(q,z,solids));
   if(reachable.length){
@@ -76,7 +76,7 @@ function minerAcquireTargetV27(q,now=performance.now(),rhythm=minerRhythmV27(now
   g.workTarget=plan.target;g.route=plan.route;return g.workTarget
 }
 function minerBodyRegionV27(q,x0,y0,x1,y1){
-  return Query.region(q.game.nearbySolids||[...bs],{min:{x:x0,y:y0},max:{x:x1,y:y1}}).filter(z=>z.game&&!z.game.liquid&&!z.game.reservoir)
+  return Query.region(q.game.nearbySolids||[...bs],{min:{x:x0,y:y0},max:{x:x1,y:y1}}).filter(z=>z.game&&!z.isSensor&&!z.game.liquid&&!z.game.reservoir)
 }
 function minerGroundedV27(q){
   const b=q.bounds;return minerBodyRegionV27(q,b.min.x+3,b.max.y-1,b.max.x-3,b.max.y+6).length>0
@@ -94,7 +94,7 @@ function minerCanHitV27(q,z,solids=q.game.nearbySolids||[...bs]){
   if(Math.hypot(dx,dy)>B*.4)return false;
   // A close block on the other side of a wall is not reachable with the pick.
   const end={x:clamp(q.position.x,b.min.x+.5,b.max.x-.5),y:clamp(q.position.y,b.min.y+.5,b.max.y-.5)};
-  return !Query.ray(solids.filter(body=>bs.has(body)&&body!==z&&body.game&&!body.game.liquid&&!body.game.reservoir),q.position,end,1).length
+  return !Query.ray(solids.filter(body=>bs.has(body)&&body!==z&&body.game&&!body.isSensor&&!body.game.liquid&&!body.game.reservoir),q.position,end,1).length
 }
 function minerRhythmV27(now){
   const r=window.SkyAudio?.rhythm?.();
@@ -188,7 +188,7 @@ function minerNavigateV27(q,target,now){
 
 updateMiners=function(now){
   const rhythm=minerRhythmV27(now);
-  const bodies=[...bs].filter(z=>z.game&&!z.game.liquid&&!z.game.reservoir);
+  const bodies=[...bs].filter(z=>z.game&&!z.isSensor&&!z.game.liquid&&!z.game.reservoir);
   for(const q of miners){
     const g=q.game,range=minerSearchRangeV27(q);
     g.nearbySolids=Query.region(bodies,{min:{x:q.position.x-range,y:q.position.y-range},max:{x:q.position.x+range,y:q.position.y+range}}).filter(z=>bs.has(z));Sleeping.set(q,false);selfRightMiner(q,now);

@@ -1,6 +1,8 @@
 // Shared, code-drawn pixel assets. Material sprites are cached at native resolution.
 var artTilesV32=new Map();
 var artPaletteV32={
+ wood:['#302532','#95633f','#bf8c55','#e0b675','#593c31'],
+ leaves:['#253729','#5b8048','#83a65b','#b5ce78','#38563b'],
  dirt:['#302335','#885137','#b97d4c','#d29c65','#59372f'],
  stone:['#242636','#687484','#929cad','#c4c7cd','#424c60'],
  deepslate:['#151724','#333c53','#505e79','#7b8aa0','#242a40'],
@@ -13,7 +15,12 @@ function artTileV32(material,variant=0){
  const tile=document.createElement('canvas');tile.width=tile.height=32;const g=tile.getContext('2d'),p=artPaletteV32[material];
  const r=(x,y,w,h,c)=>{g.fillStyle=c;g.fillRect(x,y,w,h)};
  r(0,0,32,32,p[0]);r(1,1,30,29,p[1]);r(2,2,27,1,p[2]);r(1,3,1,23,p[2]);r(3,29,27,2,p[4]);r(29,4,2,25,p[4]);
- if(material==='dirt'){
+ if(material==='wood'){
+  for(let x=4;x<29;x+=7){r(x,3,2,25,p[4]);r(x+2,4,1,22,p[2])}
+  r(12,11,7,9,p[4]);r(14,13,3,5,p[0]);r(12,21,6,1,p[3]);
+ }else if(material==='leaves'){
+  for(let i=0;i<9;i++){const x=3+(i*7+variant*3)%23,y=3+(i*11+variant)%24;r(x,y,6,4,p[i%3===0?3:2]);r(x+2,y+4,4,3,p[4])}
+ }else if(material==='dirt'){
   r(3,4,15,5,p[2]);r(3,9,9,4,p[2]);r(18,12,10,8,p[4]);r(4,23,12,4,p[4]);
   for(let i=0;i<6;i++){const x=3+(i*11+variant*3)%23,y=5+(i*7+variant*5)%21;r(x,y,3,2,p[i%2?3:4]);r(x+1,y+2,2,1,p[0])}
  }else if(material==='stone'){
@@ -130,7 +137,7 @@ function artIconV32(kind){
 }
 function installArtUiV32(){
  const set=(el,kind)=>{if(!el)return;el.style.backgroundImage='url('+artIconV32(kind)+')';el.classList.add('pixelAsset')};
- for(const kind of ['dirt','stone','deepslate'])set(document.querySelector('.blk.'+kind),kind);
+ for(const kind of ['dirt','wood','leaves','stone','deepslate','obsidian'])set(document.querySelector('.blk.'+kind),kind);
  for(const kind of ['move','pick']){const el=document.querySelector('[data-tool='+kind+'] .icon');el.textContent='';el.setAttribute('aria-hidden','true');set(el,kind)}
  const miner=document.querySelector('.minerToolIcon');for(const n of [...miner.childNodes])if(n.nodeType===3)n.textContent='';set(miner,'miner');
  const portrait=document.querySelector('.minerPortrait');portrait.textContent='';set(portrait,'miner');
