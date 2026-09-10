@@ -19,16 +19,24 @@ function makeTreeBlockV41(cx,cy,material,treeId,options={}){
 function plantTreeV41(cx,height){
   const treeId='tree:'+cx;
   for(let i=1;i<=height;i++)makeTreeBlockV41(cx,-i,'wood',treeId);
-  for(let i=1;i<=2;i++)makeTreeBlockV41(cx,-height-i,'leaves',treeId);
+  // Keep the trunk one block wide, then let the crown branch into a compact
+  // three-wide pixel canopy. The side leaves sit one row below the crown so
+  // trees read as trees instead of vertical poles.
+  makeTreeBlockV41(cx,-height-1,'leaves',treeId);
+  for(const dx of [-1,1])makeTreeBlockV41(cx+dx,-height-1,'leaves',treeId);
+  for(const dx of [-1,0,1])makeTreeBlockV41(cx+dx,-height-2,'leaves',treeId);
   return treeId
 }
 function seedTreeChunkV41(ch){
   if(treeChunksV41.has(ch))return;treeChunksV41.add(ch);
   for(let slot=0;slot<3;slot++){
+    // Trees are uncommon landmarks. Keep one deterministic starter tree in
+    // chunk 0 so a fresh world still teaches the mechanic immediately.
+    if(!(ch===0&&slot===0)&&hash01(ch,slot,415)>.18)continue;
     const cx=ch*24+3+slot*8+Math.floor(hash01(ch,slot,411)*3);
     const ground=grid.get(key(cx,0));if(!ground?.game?.terrain||ground.game.material!=='dirt')continue;
     const height=3+Math.floor(hash01(cx,0,412)*3);
-    const occupied=Query.region([...bs],{min:{x:cx*B,y:-(height+2)*B},max:{x:(cx+1)*B,y:-1}});
+    const occupied=Query.region([...bs],{min:{x:(cx-1)*B,y:-(height+2)*B},max:{x:(cx+2)*B,y:-1}});
     if(occupied.length)continue;plantTreeV41(cx,height)
   }
 }

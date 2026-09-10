@@ -75,7 +75,9 @@ main AI and the older nearby-mining helper retain lower-level material access.
 ## Trees
 
 
-Trees are one block wide, with 3–5 wood blocks and two leaf blocks at the top.
+Trees have a one-block-wide 3–5 block trunk and a compact three-wide branched
+leaf crown. They are rare landmarks, with a guaranteed starter tree in the first
+surface chunk and a low chance in later chunks.
 Cutting a trunk releases every log above the cut as a dynamic Matter.js body.
 Detached leaves fade and disappear in 1–2 seconds without granting resources;
 manually mined leaves and wood go into the toolbar and can be placed as blocks.

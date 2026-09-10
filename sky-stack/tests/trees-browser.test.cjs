@@ -22,7 +22,8 @@ const {chromium}=require('playwright'),assert=require('node:assert/strict');
    let now=0;const step=n=>{for(let i=0;i<n;i++){now+=1000/60;t.Engine.update(t.eng,1000/60);t.update(now)}};
    check(t.treeBlocksV41.size>0,'surface trees generate in the assembled game');
    const groups=new Map();for(const z of t.treeBlocksV41){const id=z.game.treeId;if(!groups.has(id))groups.set(id,[]);groups.get(id).push(z)}
-   check([...groups.values()].every(a=>new Set(a.map(z=>z.position.x)).size===1&&a.every(z=>z.game.w<=32)),'every tree is exactly one block wide, including leaves');
+   check([...groups.values()].every(a=>new Set(a.filter(z=>z.game.material==='wood').map(z=>z.position.x)).size===1&&a.every(z=>z.game.w<=32)),'every tree trunk is exactly one block wide');
+   check([...groups.values()].every(a=>a.filter(z=>z.game.material==='leaves').some(z=>z.position.x!==a[0].position.x)),'tree canopies branch out beyond the trunk');
    check(t.top()===null,'natural trees do not count as player tower height');
    t.reset();t.plant(0,5);const blocks=[...t.treeBlocksV41],cut=blocks.find(z=>z.game.material==='wood'&&z.game.treeCy===-3);
    t.mine(cut.position);check(cut.game.hits===1,'wood takes two hits');t.mine(cut.position);
@@ -49,7 +50,7 @@ const {chromium}=require('playwright'),assert=require('node:assert/strict');
   await load();
   assert.equal(await page.evaluate(()=>treeTest.inv.wood),saved.inv.wood);assert.equal(await page.evaluate(()=>treeTest.inv.leaves),1);
   const restored=await page.evaluate(()=>[...treeTest.treeBlocksV41].filter(z=>z.game.treeId==='tree:0').map(z=>({cy:z.game.treeCy,x:z.position.x,y:z.position.y,attached:z.game.attached,decay:z.game.decay})));
-  assert.equal(restored.length,saved.treesV41.blocks.length);for(const r of restored){const was=saved.treesV41.blocks.find(z=>z.cy===r.cy);assert.equal(r.attached,was.attached);assert.equal(r.decay,was.decay);assert.equal(r.x,was.x);assert.equal(r.y,was.y)}
+  assert.equal(restored.length,saved.treesV41.blocks.length);for(const r of restored){const was=saved.treesV41.blocks.find(z=>z.cy===r.cy&&Math.abs(z.x-r.x)<.01);assert(was,'restored tree block coordinate missing');assert.equal(r.attached,was.attached);assert.equal(r.decay,was.decay);assert.equal(r.x,was.x);assert.equal(r.y,was.y)}
   console.log('PASS wood, leaves, fallen positions, and decay timers restore without duplicates');
   await page.evaluate(()=>{
    const t=treeTest;t.reset();t.plant(0,3);t.mine(t.ground().position);
