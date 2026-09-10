@@ -4,6 +4,7 @@ var artPaletteV32={
  dirt:['#302335','#885137','#b97d4c','#d29c65','#59372f'],
  stone:['#242636','#687484','#929cad','#c4c7cd','#424c60'],
  deepslate:['#151724','#333c53','#505e79','#7b8aa0','#242a40'],
+ obsidian:['#0d0a18','#302039','#674c85','#9b78bc','#130f20'],
  bedrock:['#0b101b','#202636','#354354','#596276','#141a28']
 };
 for(const material of Object.keys(artPaletteV32))M[material].col=[artPaletteV32[material][1],artPaletteV32[material][4]];
@@ -122,7 +123,7 @@ function artIconV32(kind){
  const r=(x,y,w,h,c)=>{g.fillStyle=c;g.fillRect(x,y,w,h)};
  if(artPaletteV32[kind])g.drawImage(artTileV32(kind),0,0);
  else if(kind==='miner')artMinerV32(g,1);
- else if(kind==='pick'){for(let i=0;i<6;i++){r(7+i*2,23-i*2,4,4,'#473447');r(8+i*2,23-i*2,2,2,'#ba895c')}r(10,6,16,4,'#454557');r(12,5,12,2,'#d0d8df');r(22,9,4,6,'#8394a7')}
+ else if(kind==='pick'){const head=['#9e9ba4','#e4e9ed','#a2c9d1','#ba9be5'][pickaxeTier];for(let i=0;i<6;i++){r(7+i*2,23-i*2,4,4,'#473447');r(8+i*2,23-i*2,2,2,'#ba895c')}r(10,6,16,4,'#454557');r(12,5,12,2,head);r(22,9,4,6,head)}
  else if(kind==='move'){r(12,4,7,22,'#694551');r(9,12,16,11,'#694551');r(13,5,5,16,'#e8b184');r(10,13,13,9,'#e8b184');r(12,22,10,5,'#b98364');r(19,8,3,11,'#e8b184');r(23,11,3,9,'#e8b184');r(10,14,2,5,'#ffdbac')}
  else if(kind==='lamp'){r(10,4,12,15,'#896840');r(8,7,16,9,'#cf9e53');r(11,6,10,10,'#ffe8aa');r(13,19,6,6,'#a6b3b8');r(12,22,8,2,'#526478');r(12,7,3,5,'#fff8da')}
  return icon.toDataURL()

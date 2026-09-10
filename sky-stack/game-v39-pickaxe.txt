@@ -1,0 +1,65 @@
+// Permanent pickaxe tiers. Damage and material unlocks still use the player mine path.
+const pickaxeTiersV39=[
+  {name:'Stone',size:1,cost:0,color:'#b4acb8'},
+  {name:'Iron',size:2,cost:5,color:'#e4e9ed'},
+  {name:'Steel',size:3,cost:20,color:'#a2c9d1'},
+  {name:'Titanium',size:4,cost:50,color:'#ba9be5'}
+];
+let pickaxeHoverV39=null,pickaxeArtTierV39=-1;
+function pickaxeBrushV39(p){
+  const size=pickaxeTiersV39[pickaxeTier].size,offset=Math.floor((size-1)/2);
+  return{x:Math.floor(p.x/B)-offset,y:Math.floor(p.y/B)-offset,size}
+}
+function pickaxeDragV39(g,now=performance.now()){
+  if(!pickaxeTier||g.t!=='pick')return;
+  if(!g.pickHits)g.pickHits=new Map();
+  const from=g.pickLast||g.a,to=g.b,steps=Math.max(1,Math.ceil(Math.hypot(to.x-from.x,to.y-from.y)/(B*.5)));
+  const cells=new Map();
+  for(let i=0;i<=steps;i++){
+    const r=pickaxeBrushV39({x:from.x+(to.x-from.x)*i/steps,y:from.y+(to.y-from.y)*i/steps});
+    for(let y=r.y;y<r.y+r.size;y++)for(let x=r.x;x<r.x+r.size;x++)cells.set(key(x,y),{x:(x+.5)*B,y:(y+.5)*B})
+  }
+  // Top-to-bottom processing can expose the next dirt row during a single swing.
+  const points=[...cells.values()].sort((a,b)=>a.y-b.y||a.x-b.x);
+  for(const p of points){
+    const z=at(p);if(!z?.game||z.game.liquid||z.game.reservoir)continue;
+    if(now-(g.pickHits.get(z)??-Infinity)<220)continue;
+    if(!devToolsV30.oneHit&&(z.game.material==='bedrock'||z.game.material==='stone'&&!stone||z.game.terrain&&!terrainExposed(z)))continue;
+    g.pickHits.set(z,now);mine(p)
+  }
+  g.pickLast={...to}
+}
+function refreshPickaxeV39(){
+  const current=pickaxeTiersV39[pickaxeTier],next=pickaxeTiersV39[pickaxeTier+1];
+  $('pickaxeLabel').textContent=current.name.toUpperCase()+' '+current.size+'×'+current.size;
+  document.querySelector('[data-tool=pick]').setAttribute('aria-label',current.name+' pickaxe, '+current.size+' by '+current.size+' mining');
+  $('pickaxeUpgrade').textContent=next?'UPGRADE PICK · '+next.cost+' GOLD':'TITANIUM PICK · MAX';
+  $('pickaxeCurrent').textContent='Equipped: '+current.name+' · '+current.size+'×'+current.size+' · Gold: '+inv.gold;
+  $('pickaxeTiers').innerHTML=pickaxeTiersV39.map((t,i)=>'<div class="pickaxeTier '+(i===pickaxeTier?'equipped':'')+'"><b>'+t.name+'</b><span>'+t.size+'×'+t.size+'</span><small>'+(i===pickaxeTier?'EQUIPPED':i<pickaxeTier?'UPGRADED':t.cost+' GOLD')+'</small></div>').join('');
+  $('pickaxeBuy').textContent=next?'UPGRADE TO '+next.name.toUpperCase()+' · '+next.cost+' GOLD':'FULLY UPGRADED';
+  $('pickaxeBuy').disabled=!next||inv.gold<next.cost;
+  $('pickaxeFunds').textContent=next?(inv.gold<next.cost?'Need '+(next.cost-inv.gold)+' more gold.':'Unlocks permanent '+next.size+'×'+next.size+' drag mining.'):'Your pickaxe is at its highest tier.';
+  if(pickaxeArtTierV39!==pickaxeTier){document.querySelector('[data-tool=pick] .icon').style.backgroundImage='url('+artIconV32('pick')+')';pickaxeArtTierV39=pickaxeTier}
+}
+function buyPickaxeV39(){
+  const next=pickaxeTiersV39[pickaxeTier+1];if(!next||inv.gold<next.cost)return false;
+  inv.gold-=next.cost;pickaxeTier++;gesture=null;ui();saveGame();$('pickaxeShop').close();
+  SkyAudio.unlock();toast(next.name.toUpperCase()+' PICKAXE · '+next.size+'×'+next.size+'\nDRAG TO MINE',true);return true
+}
+const pickaxeBaseUiV39=ui;
+ui=function(){pickaxeBaseUiV39();refreshPickaxeV39()};
+$('pickaxeUpgrade').onclick=()=>{gesture=null;refreshPickaxeV39();$('pickaxeShop').showModal()};
+$('pickaxeClose').onclick=()=> $('pickaxeShop').close();
+$('pickaxeBuy').onclick=buyPickaxeV39;
+$('pickaxeShop').addEventListener('close',()=> $('pickaxeUpgrade').focus());
+c.addEventListener('pointermove',e=>{pickaxeHoverV39=pos(e)});
+c.addEventListener('pointerleave',()=>{pickaxeHoverV39=null});
+const pickaxeBasePreviewV39=preview;
+preview=function(){
+  pickaxeBasePreviewV39();if(!pickaxeTier||tool!=='pick'||(!gesture&&!pickaxeHoverV39))return;
+  const p=gesture?.t==='pick'?gesture.b:pickaxeHoverV39?s2w(pickaxeHoverV39.x,pickaxeHoverV39.y):null;if(!p)return;
+  const r=pickaxeBrushV39(p),s=w2s(r.x*B,r.y*B),size=r.size*B*cam.z;
+  ctx.save();ctx.fillStyle=pickaxeTiersV39[pickaxeTier].color;ctx.globalAlpha=.14;ctx.fillRect(s.x,s.y,size,size);
+  ctx.globalAlpha=.9;ctx.strokeStyle=pickaxeTiersV39[pickaxeTier].color;ctx.lineWidth=2;ctx.strokeRect(s.x,s.y,size,size);ctx.restore()
+};
+setInterval(()=>{if(gesture?.t==='pick'&&gesture.moved&&pickaxeTier&&!document.hidden)pickaxeDragV39(gesture)},110);

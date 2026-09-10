@@ -17,12 +17,13 @@ const M={
   bedrock:{taps:Infinity,d:.005,f:1,r:0,a:.004,col:['#1d2229','#11151a']}
 };
 
-const inv={dirt:0,stone:0,deepslate:0,gold:0};
+const inv={dirt:0,stone:0,deepslate:0,obsidian:0,gold:0};
 const bs=new Set(),grid=new Map(),generated=new Set(),pointers=new Map(),miners=new Set();
 const removedTerrain=new Set(),terrainDamage=new Map(),restingMiners=[];
 const goldBursts=[];
 const cam={x:0,y:-180,z:1,tx:0,ty:-180,anim:false};
 
+let pickaxeTier=0;
 let tool='pick',gesture=null,best=0,shape=false,stone=false,deepslate=false,toastTimer,minerId=0,selectedMiner=null;
 let pendingPlacement=null,restoring=false,resetting=false,lastSavedAt=0,deadMiners=0;
 let highCandidate=null;

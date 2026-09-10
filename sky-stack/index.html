@@ -13,6 +13,7 @@
   <link rel="stylesheet" href="style-v28.css?v=28">
   <link rel="stylesheet" href="style-v30-dev.css?v=30">
   <link rel="stylesheet" href="style-v32-art.css?v=32">
+  <link rel="stylesheet" href="style-v39-pickaxe.css?v=39">
 </head>
 <body>
 <div id="app">
@@ -52,7 +53,7 @@
         <p><b>MOVE</b> drags around safely. Pinch to zoom.</p><p><b>TOP / DOWN</b> jump between your tower and mine.</p><p><b>GRID</b> switches between snapped and free placement.</p>
       </div></details>
       <details><summary>MINING &amp; BUILDING <span>Blocks, miners, records</span></summary><div class="tipBody">
-        <p>Tap exposed blocks to mine. Buried blocks must touch open space.</p><p>Miners prioritize blocks within reach, jump and climb toward work, and back away when stuck. They keep earlier mining abilities when upgraded: level 1 mines dirt, level 2 adds stone, and level 3 adds deepslate. Dirt hits on beats 1 and 3; stone on 2 and 4; deepslate on the “and” after 2 and 4.</p><p>Height records must stay stable for 3 seconds before they count.</p>
+        <p>Tap exposed blocks to mine. Buried blocks must touch open space.</p><p>Upgrade your pick for permanent drag mining: Iron 2×2 costs 5 gold, Steel 3×3 costs 20, and Titanium 4×4 costs 50. Drag or hold after starting a stroke to keep swinging. Use MOVE to pan.</p><p>Miners prioritize blocks within reach, jump and climb toward work, and back away when stuck. They keep earlier mining abilities when upgraded: level 1 mines dirt, level 2 adds stone, and level 3 adds deepslate. Dirt hits on beats 1 and 3; stone on 2 and 4; deepslate on the “and” after 2 and 4.</p><p>Height records must stay stable for 3 seconds before they count.</p>
       </div></details>
       <details><summary>LIQUIDS &amp; SECRETS <span>Water, lava, discoveries</span></summary><div class="tipBody">
         <p>Dirt floats in water. Stone and deepslate sink.</p><p>Water touching lava cools into solid obsidian.</p><p>No spoilers—valuable things can hide where you least expect them.</p>
@@ -64,18 +65,27 @@
     </div></div>
   </div>
 
+  <button class="btn" id="pickaxeUpgrade" aria-haspopup="dialog" aria-controls="pickaxeShop">UPGRADE PICK · 5 GOLD</button>
   <div id="bar">
     <button class="slot" data-tool="move"><span class="icon">✋</span><span>MOVE</span></button>
-    <button class="slot sel" data-tool="pick"><span class="icon">⛏</span><span>PICK</span></button>
+    <button class="slot sel" data-tool="pick"><span class="icon">⛏</span><span id="pickaxeLabel">STONE 1×1</span></button>
     <button class="slot empty" data-tool="dirt"><span class="blk dirt"><b class="num" id="dc">0</b></span><span>DIRT</span></button>
     <button class="slot locked" data-tool="stone" id="stoneSlot"><span class="blk stone"><b class="num" id="sc">0</b><i class="lock">×</i></span><span>STONE</span></button>
     <button class="slot locked" data-tool="deepslate" id="deepSlot"><span class="blk deepslate"><b class="num" id="dsc">0</b><i class="lock">?</i></span><span>DEEP</span></button>
+    <button class="slot locked" data-tool="obsidian" id="obsidianSlot"><span class="blk obsidian"><b class="num" id="oc">0</b><i class="lock">?</i></span><span>OBSIDIAN</span></button>
     <button class="slot locked" data-tool="miner" id="minerSlot">
       <span class="minerToolIcon">👷<b class="minerCount" id="mc">0</b><i class="lock">20m</i></span>
       <span>MINER</span>
     </button>
   </div>
 
+  <dialog id="pickaxeShop" class="box" aria-labelledby="pickaxeShopTitle">
+    <header><h2 id="pickaxeShopTitle">PICKAXE UPGRADES</h2><button id="pickaxeClose" class="btn" aria-label="Close pickaxe upgrades">✕</button></header>
+    <p id="pickaxeCurrent"></p><div id="pickaxeTiers"></div>
+    <p class="pickaxeNote">Upgrades are permanent for this world. You cannot switch back to an earlier pickaxe. Harder blocks still take multiple hits.</p>
+    <p class="pickaxeNote">With an upgraded pick, drag to mine and hold to keep swinging. Use MOVE or two fingers to pan.</p>
+    <button id="pickaxeBuy" class="btn primary"></button><p id="pickaxeFunds" role="status"></p>
+  </dialog>
   <div id="overlapWarn" class="modal" aria-hidden="true">
     <div class="modalCard box"><div class="warningIcon">⚠</div><b>BLOCK COLLISION</b><p>This block overlaps one of your placed blocks.</p><p class="warningText">Placing it anyway may push, tilt, or launch your other blocks because the physics will force them apart.</p><label class="dontShow"><input type="checkbox" id="overlapDont"> <span>Don't show this again</span></label><div class="modalActions"><button class="btn" id="overlapCancel">CANCEL</button><button class="btn primary" id="overlapPlace">PLACE ANYWAY</button></div></div>
   </div>
@@ -91,12 +101,12 @@
 
   <div id="killModal" class="modal" aria-hidden="true"><div class="modalCard box restartCard"><div class="warningIcon dangerIcon">!</div><b>KILL THIS MINER?</b><p>You will permanently lose this miner.</p><p class="warningText">You will recover the <b id="killGold">0</b> gold he is carrying. A killed miner does not return to your toolbar.</p><div class="modalActions"><button class="btn" id="killCancel">NEVER MIND</button><button class="btn danger" id="killConfirm">YES, KILL MINER</button></div></div></div>
 
-  <div id="restartModal" class="modal" aria-hidden="true"><div class="modalCard box restartCard"><div class="warningIcon">↻</div><b>RESTART SKY STACK?</b><p>This permanently deletes this world's locally saved progress in this browser.</p><p class="warningText">Your mined terrain, inventory, gold, placed blocks, height progress, and miners will all reset to the beginning.</p><label class="dontShow restartAgree"><input type="checkbox" id="restartAgree"> <span>I understand my saved world will be deleted.</span></label><div class="modalActions"><button class="btn" id="restartCancel">KEEP MY WORLD</button><button class="btn danger" id="restartConfirm" disabled>YES, START OVER</button></div></div></div>
+  <div id="restartModal" class="modal" aria-hidden="true"><div class="modalCard box restartCard"><div class="warningIcon">↻</div><b>RESTART SKY STACK?</b><p>This permanently deletes this world's locally saved progress in this browser.</p><p class="warningText">Your mined terrain, inventory, gold, placed blocks, height progress, pickaxe upgrades, and miners will all reset to the beginning.</p><label class="dontShow restartAgree"><input type="checkbox" id="restartAgree"> <span>I understand my saved world will be deleted.</span></label><div class="modalActions"><button class="btn" id="restartCancel">KEEP MY WORLD</button><button class="btn danger" id="restartConfirm" disabled>YES, START OVER</button></div></div></div>
 
   <div id="toast" class="hide"></div><div id="load">Loading physics…</div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/matter-js@0.20.0/build/matter.min.js"></script>
 <script src="audio.js?v=37"></script>
-<script src="game-v28.js?v=38"></script>
+<script src="game-v28.js?v=39"></script>
 </body>
 </html>

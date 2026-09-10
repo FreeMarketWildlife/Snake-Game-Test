@@ -1,0 +1,13 @@
+#pickaxeUpgrade{position:absolute;right:10px;bottom:122px;min-height:36px;padding:8px 12px;font-size:9px;color:var(--gold);z-index:3}
+#pickaxeShop{width:min(380px,calc(100vw - 24px));max-height:calc(100dvh - 32px);overflow:auto;padding:20px;color:var(--text);background:var(--panel);touch-action:pan-y}
+#pickaxeShop::backdrop{background:#121723b3}
+#pickaxeShop header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+#pickaxeShop h2{font:900 13px ui-monospace,monospace;color:var(--gold);margin:0}
+#pickaxeClose{min-width:36px;min-height:36px}
+#pickaxeCurrent{font-size:10px;line-height:1.6;color:var(--gold)}
+.pickaxeTier{display:grid;grid-template-columns:1fr 48px 80px;gap:8px;align-items:center;padding:12px 8px;border:1px solid #706078;font-size:11px;margin:6px 0}
+.pickaxeTier small{text-align:right;font-size:8px;color:var(--muted)}
+.pickaxeTier.equipped{border-color:var(--gold);background:#53414e}.pickaxeTier.equipped small{color:var(--gold)}
+.pickaxeNote,#pickaxeFunds{font-size:10px;line-height:1.65;color:var(--muted)}
+#pickaxeBuy{width:100%;min-height:44px;font-size:10px;color:var(--gold)}
+@media(max-width:420px){#pickaxeUpgrade{bottom:120px;right:6px;font-size:8px}#pickaxeShop{padding:14px}}
