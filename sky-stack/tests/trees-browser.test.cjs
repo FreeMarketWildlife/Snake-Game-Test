@@ -50,7 +50,7 @@ const {chromium}=require('playwright'),assert=require('node:assert/strict');
   await load();
   assert.equal(await page.evaluate(()=>treeTest.inv.wood),saved.inv.wood);assert.equal(await page.evaluate(()=>treeTest.inv.leaves),1);
   const restored=await page.evaluate(()=>[...treeTest.treeBlocksV41].filter(z=>z.game.treeId==='tree:0').map(z=>({cy:z.game.treeCy,x:z.position.x,y:z.position.y,attached:z.game.attached,decay:z.game.decay})));
-  assert.equal(restored.length,saved.treesV41.blocks.length);for(const r of restored){const was=saved.treesV41.blocks.find(z=>z.cy===r.cy&&Math.abs(z.x-r.x)<.01);assert(was,'restored tree block coordinate missing');assert.equal(r.attached,was.attached);assert.equal(r.decay,was.decay);assert.equal(r.x,was.x);assert.equal(r.y,was.y)}
+  const savedTree0=saved.treesV41.blocks.filter(z=>z.treeId==='tree:0');assert.equal(restored.length,savedTree0.length);for(const r of restored){const was=savedTree0.find(z=>z.cy===r.cy&&Math.abs(z.x-r.x)<.01);assert(was,'restored tree block coordinate missing');assert.equal(r.attached,was.attached);assert.equal(r.decay,was.decay);assert.equal(r.x,was.x);assert.equal(r.y,was.y)}
   console.log('PASS wood, leaves, fallen positions, and decay timers restore without duplicates');
   await page.evaluate(()=>{
    const t=treeTest;t.reset();t.plant(0,3);t.mine(t.ground().position);
