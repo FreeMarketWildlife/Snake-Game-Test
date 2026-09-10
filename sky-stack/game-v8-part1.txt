@@ -77,7 +77,10 @@ function ui(){
 
 function at(p){const a=Query.point([...bs],p);a.sort((a,b)=>(b.game?.born||0)-(a.game?.born||0));return a[0]}
 function minerAt(p){return Query.point([...miners],p)[0]||null}
-function wake(){for(const q of bs)if(q.game?.placed&&!q.isStatic){Sleeping.set(q,false);Body.setVelocity(q,{x:q.velocity.x,y:q.velocity.y+.001})}}
+// Wake placed bodies after liquid/world changes without injecting a downward
+// impulse. The old nudge accumulated through tall stacks and could topple a
+// stable tower when an unrelated world block was mined.
+function wake(){for(const q of bs)if(q.game?.placed&&!q.isStatic)Sleeping.set(q,false)}
 function goldBurst(x,y,n,stolen=false){goldBursts.push({x,y,n,stolen,born:performance.now()})}
 function terrainExposed(z){
   if(!z?.game?.terrain)return true;
