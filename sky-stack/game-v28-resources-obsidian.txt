@@ -121,7 +121,7 @@ var v28BaseRefreshMinerMenu=refreshMinerMenu;
 refreshMinerMenu=function(){
   v28BaseRefreshMinerMenu();
   if(selectedMiner&&miners.has(selectedMiner)&&selectedMiner.game.level>=3){
-    $('minerDesc').textContent='He mines deepslate and automatically shares half of every gold find with you.'
+    $('minerDesc').textContent='He mines dirt on 1 and 3, stone on 2 and 4, and deepslate on the “and” after 2 and 4. He shares half of every gold find with you.'
   }
 };
 

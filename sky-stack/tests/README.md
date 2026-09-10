@@ -46,3 +46,22 @@ Tools remain in its fixed footer, so neither action depends on scrolling. The De
 button no longer occupies the game HUD. The score in `audio.js` is a 12-bar,
 72-BPM MIDI-note arrangement rendered by Web Audio oscillators. Wind and birds
 are procedurally generated on a separate ambience bus at a much lower gain.
+
+## Miner rhythm
+
+Run `node sky-stack/tests/miners.test.cjs` for cumulative level permissions, target
+selection, material-specific beat windows, and duplicate-frame prevention. Dirt
+hits on 1 and 3, stone on 2 and 4, and deepslate on the eighth-note offbeats after
+2 and 4. Mining follows the audio clock, with a matching 72 BPM silent fallback.
+
+The AI holds position while digging, prioritizes blocks within pick reach, and
+backs away from targets after two stalled attempts. All levels can jump and grip
+short walls; higher levels can climb taller ledges. Suspended audio uses the
+silent beat clock so miners keep working.
+
+With the game served locally and Playwright available, run
+`SKY_TEST_URL=http://127.0.0.1:8765/sky-stack/ node sky-stack/tests/miners-browser.test.cjs`.
+Optionally set `SKY_TEST_BROWSER` to an existing Chromium executable. This test
+loads the production bundle in an isolated browser context and exercises real
+Matter.js physics, harvesting, obstacle jumps, tall-wall climbing, unreachable
+target recovery, live music, and audio suspension without touching your saves.
