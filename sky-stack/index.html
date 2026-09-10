@@ -56,6 +56,9 @@
       <details><summary>MINING &amp; BUILDING <span>Blocks, miners, records</span></summary><div class="tipBody">
         <p>Tap exposed blocks to mine. Buried blocks must touch open space.</p><p>Upgrade your pick for permanent drag mining: Iron 2×2 costs 5 gold, Steel 3×3 costs 20, and Titanium 4×4 costs 50. Drag or hold after starting a stroke to keep swinging. Use MOVE to pan.</p><p>Miners prioritize blocks within reach, jump and climb toward work, and back away when stuck. They keep earlier mining abilities when upgraded: level 1 mines dirt, level 2 adds stone, and level 3 adds deepslate. Dirt hits on beats 1 and 3; stone on 2 and 4; deepslate on the “and” after 2 and 4.</p><p>Height records must stay stable for 3 seconds before they count.</p>
       </div></details>
+      <details><summary>MINER GHOSTS <span>Hazards and revival</span></summary><div class="tipBody">
+        <p>Miners drown after 5 seconds with their head underwater, or burn after a short stay in lava. Watch their air and heat bars.</p><p>Their ghosts sway upward with a spooky melody. Tap a ghost with any tool to revive the miner right there in a burst of pixels, keeping its level and pocket gold.</p><p>Revived miners have a brief protective shield. Ghosts wait above the world and save with your game. Gold claimed through the miner menu stays in your inventory.</p>
+      </div></details>
       <details><summary>TREES <span>Wood, leaves, falling trunks</span></summary><div class="tipBody">
         <p>Wood takes two hits to chop. Every trunk block above the cut falls with gravity; you can mine the fallen logs too.</p><p>Unsupported leaves disappear in 1–2 seconds. Mine them first to collect leaf blocks.</p><p>Use WOOD and LEAVES in the toolbar to build. Placed leaf blocks stay put. On phones, swipe the toolbar to see every material.</p>
       </div></details>
@@ -105,14 +108,14 @@
     </div>
   </div>
 
-  <div id="killModal" class="modal" aria-hidden="true"><div class="modalCard box restartCard"><div class="warningIcon dangerIcon">!</div><b>KILL THIS MINER?</b><p>You will permanently lose this miner.</p><p class="warningText">You will recover the <b id="killGold">0</b> gold he is carrying. A killed miner does not return to your toolbar.</p><div class="modalActions"><button class="btn" id="killCancel">NEVER MIND</button><button class="btn danger" id="killConfirm">YES, KILL MINER</button></div></div></div>
+  <div id="killModal" class="modal" aria-hidden="true"><div class="modalCard box restartCard"><div class="warningIcon dangerIcon">!</div><b>KILL THIS MINER?</b><p>The miner will become a ghost. Tap the ghost to revive them.</p><p class="warningText">You will recover the <b id="killGold">0</b> gold they are carrying. Reviving them will not return that claimed gold to their pocket.</p><div class="modalActions"><button class="btn" id="killCancel">NEVER MIND</button><button class="btn danger" id="killConfirm">YES, KILL MINER</button></div></div></div>
 
   <div id="restartModal" class="modal" aria-hidden="true"><div class="modalCard box restartCard"><div class="warningIcon">↻</div><b>RESTART SKY STACK?</b><p>This permanently deletes this world's locally saved progress in this browser.</p><p class="warningText">Your mined terrain, inventory, gold, placed blocks, height progress, pickaxe upgrades, and miners will all reset to the beginning.</p><label class="dontShow restartAgree"><input type="checkbox" id="restartAgree"> <span>I understand my saved world will be deleted.</span></label><div class="modalActions"><button class="btn" id="restartCancel">KEEP MY WORLD</button><button class="btn danger" id="restartConfirm" disabled>YES, START OVER</button></div></div></div>
 
   <div id="toast" class="hide"></div><div id="load">Loading physics…</div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/matter-js@0.20.0/build/matter.min.js"></script>
-<script src="audio.js?v=37"></script>
-<script src="game-v28.js?v=41"></script>
+<script src="audio.js?v=42"></script>
+<script src="game-v28.js?v=42"></script>
 </body>
 </html>

@@ -3,11 +3,11 @@
 
 const coreParts=[
   'game-v8-part0.txt?v=41',
-  'game-v8-part1.txt?v=41',
-  'game-v8-part2.txt?v=36'
+  'game-v8-part1.txt?v=42',
+  'game-v8-part2.txt?v=42'
 ];
 const liquidParts=[
-  'game-v10-liquid.txt?v=41',
+  'game-v10-liquid.txt?v=42',
   'game-v10-liquid-fixes.txt?v=28',
   'game-v13-liquid-visibility.txt?v=28',
   'game-v14-liquid-guarantee.txt?v=28',
@@ -31,7 +31,8 @@ const obsidianArtUrl='game-v31-obsidian-art.txt?v=31';
 const artDirectionUrl='game-v32-art-direction.txt?v=41';
 const pickaxeUrl='game-v39-pickaxe.txt?v=39';
 const treesUrl='game-v41-trees.txt?v=41';
-const tailUrl='game-v8-part3.txt?v=39';
+const spiritsUrl='game-v42-miner-ghosts.txt?v=42';
+const tailUrl='game-v8-part3.txt?v=42';
 
 async function read(url){
   const r=await fetch(url,{cache:'no-store'});
@@ -61,9 +62,10 @@ async function read(url){
     const artDirection=await read(artDirectionUrl);
     const pickaxe=await read(pickaxeUrl);
     const trees=await read(treesUrl);
+    const spirits=await read(spiritsUrl);
     const marker='restoreDynamicState(initialSave);';
     if(!tail.includes(marker))throw new Error('v28 insertion marker missing');
-    tail=tail.replace(marker,camera+'\n'+grid+'\n'+zoom+'\n'+miner+'\n'+resources+'\n'+liquidFeel+'\n'+devPanel+'\n'+obsidianArt+'\n'+artDirection+'\n'+pickaxe+'\n'+trees+'\n'+marker);
+    tail=tail.replace(marker,camera+'\n'+grid+'\n'+zoom+'\n'+miner+'\n'+resources+'\n'+liquidFeel+'\n'+devPanel+'\n'+obsidianArt+'\n'+artDirection+'\n'+pickaxe+'\n'+trees+'\n'+spirits+'\n'+marker);
 
     const src=core+'\n});\n'+liquid+'\n'+tail;
     (0,eval)(src);

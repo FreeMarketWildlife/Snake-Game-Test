@@ -1,0 +1,151 @@
+// Environmental damage uses the filled portion of the real liquid subcells.
+// Dead workers remain accounted for until their saved ghost is revived.
+var minerGhostsV42=new Map(),spiritBurstsV42=[],spiritLastTickV42=null,spiritHoverV42=null;
+const MINER_AIR_V42=5000,MINER_FIRE_V42=900,MINER_GRACE_V42=2200;
+function liquidPointV42(x,y){
+  const size=liquidSBV22(),r=liquidSubRecV22(Math.floor(x/size),Math.floor(y/size));
+  return r&&r.a>.01&&y>=(r.y+1-clamp(r.a,0,1))*size?r.kind:null
+}
+function minerExposureV42(q){
+  const b=q.bounds,size=liquidSBV22();let lava=false,wetHead=0;
+  for(const dx of [-B*.18,0,B*.18])if(liquidPointV42(q.position.x+dx,b.min.y+B*.12)==='water')wetHead++;
+  for(let y=Math.floor(b.min.y/size);y<=Math.floor(b.max.y/size);y++)for(let x=Math.floor(b.min.x/size);x<=Math.floor(b.max.x/size);x++){
+    const r=liquidSubRecV22(x,y);if(r?.kind!=='lava'||r.a<.02)continue;
+    const top=(y+1-clamp(r.a,0,1))*size;
+    if(b.max.y>top&&b.min.y<(y+1)*size&&b.max.x>x*size&&b.min.x<(x+1)*size)lava=true
+  }
+  return{underwater:wetHead>=2,lava}
+}
+function spiritSpatialV42(x,y){return minerSpatialV27({position:{x,y}})}
+function spiritBurstV42(x,y,kind){
+  const colors=kind==='revive'?['#fff4b5','#c5ffe4','#ab9be8']:kind==='lava'?['#ffd18b','#ed896c','#b9a0ea']:['#c3f6ed','#7aaccd','#c4a9ed'];
+  spiritBurstsV42.push({x,y,age:0,kind,pixels:Array.from({length:kind==='revive'?24:14},(_,i)=>{
+    const a=i*2.39996,speed=kind==='revive'?35+(i%5)*12:15+(i%4)*8;
+    return{vx:Math.cos(a)*speed,vy:Math.sin(a)*speed-16,size:i%3===0?3:2,color:colors[i%colors.length]}
+  })})
+}
+function minerDieV42(q,cause){
+  if(!miners.has(q)||minerGhostsV42.has(q.game.id))return false;
+  const g=q.game,ghost={id:g.id,level:g.level,gold:g.gold,dir:g.dir||1,cause,
+    anchorX:q.position.x,x:q.position.x,y:q.position.y,age:0,phase:hash01(g.id,0,421)*Math.PI*2};
+  miners.delete(q);World.remove(eng.world,q);deadMiners++;minerGhostsV42.set(g.id,ghost);
+  if(selectedMiner===q){closeMinerMenu();$('killModal').classList.remove('show');$('killModal').setAttribute('aria-hidden','true')}
+  spiritBurstV42(ghost.x,ghost.y,cause);const sp=spiritSpatialV42(ghost.x,ghost.y);
+  window.SkyAudio?.spiritCue?.('death',sp.gain,sp.pan);ui();saveGame();
+  if(sp.gain>.4)toast(cause==='lava'?'MINER LOST TO LAVA · TAP THE GHOST TO REVIVE':cause==='water'?'MINER DROWNED · TAP THE GHOST TO REVIVE':'TAP THE GHOST TO REVIVE',true);
+  return true
+}
+function ghostAtV42(p){
+  const radius=Math.max(B*.52,18/Math.max(.25,cam.z));let closest=null,distance=Infinity;
+  for(const ghost of minerGhostsV42.values()){
+    const d=Math.hypot(p.x-ghost.x,(p.y-ghost.y)*.8);
+    if(d<radius&&d<distance){closest=ghost;distance=d}
+  }
+  return closest
+}
+function reviveGhostAtV42(p){
+  const ghost=ghostAtV42(p);if(!ghost)return false;
+  ensureChunkAtX(ghost.x);
+  const q=createMinerAt(ghost.x,ghost.y,{id:ghost.id,level:ghost.level,gold:ghost.gold,dir:ghost.dir});
+  q.game.reviveGraceV42=MINER_GRACE_V42;q.game.waterMsV42=0;q.game.fireMsV42=0;
+  minerGhostsV42.delete(ghost.id);deadMiners=Math.max(0,deadMiners-1);
+  spiritBurstV42(ghost.x,ghost.y,'revive');const sp=spiritSpatialV42(ghost.x,ghost.y);
+  window.SkyAudio?.spiritCue?.('revive',sp.gain,sp.pan);ui();saveGame();toast('MINER REVIVED · BACK TO WORK!');return true
+}
+function updateMinerLifeV42(now){
+  liquidV22Init();const dt=spiritLastTickV42===null?0:clamp(now-spiritLastTickV42,0,100);spiritLastTickV42=now;
+  const ceiling=Math.min(-B*5,(topInfo()?.y||0)-B*3);
+  for(const ghost of minerGhostsV42.values()){
+    ghost.age+=dt;ghost.y-=ghost.y>ceiling?Math.min(dt*.009,ghost.y-ceiling):0;
+    ghost.x=ghost.anchorX+(Math.sin(ghost.age/1250+ghost.phase)-Math.sin(ghost.phase))*B*.4
+  }
+  for(const burst of spiritBurstsV42)burst.age+=dt;
+  spiritBurstsV42=spiritBurstsV42.filter(b=>b.age<850);
+  for(const q of miners){
+    const g=q.game,e=minerExposureV42(q);
+    g.waterMsV42=finite(g.waterMsV42);g.fireMsV42=finite(g.fireMsV42);
+    if(g.reviveGraceV42>0){g.reviveGraceV42=Math.max(0,g.reviveGraceV42-dt);continue}
+    g.waterMsV42=clamp(g.waterMsV42+(e.underwater?dt:-dt*2),0,MINER_AIR_V42);
+    g.fireMsV42=clamp(g.fireMsV42+(e.lava?dt:-dt*4),0,MINER_FIRE_V42);
+    if(g.fireMsV42>=MINER_FIRE_V42)minerDieV42(q,'lava');
+    else if(g.waterMsV42>=MINER_AIR_V42)minerDieV42(q,'water')
+  }
+  let mix=0,pan=0;
+  for(const ghost of minerGhostsV42.values()){const sp=spiritSpatialV42(ghost.x,ghost.y);if(sp.gain>mix){mix=sp.gain;pan=sp.pan}}
+  window.SkyAudio?.setGhostPresence?.(mix,pan)
+}
+function saveMinerLifeV42(){
+  if(!minerGhostsV42)return initialSave?.minerLifeV42;
+  return{ghosts:[...minerGhostsV42.values()].map(g=>({...g})),living:[...miners].map(q=>({
+    id:q.game.id,water:finite(q.game.waterMsV42),fire:finite(q.game.fireMsV42),grace:finite(q.game.reviveGraceV42)
+  }))}
+}
+var spiritBaseRestoreV42=restoreDynamicState;
+restoreDynamicState=function(s){
+  spiritBaseRestoreV42(s);
+  for(const r of s?.minerLifeV42?.ghosts||[]){
+    if(!Number.isInteger(r.id)||r.id<1||!Number.isFinite(r.x)||!Number.isFinite(r.y)||minerGhostsV42.has(r.id))continue;
+    if([...miners].some(q=>q.game.id===r.id))continue;
+    minerGhostsV42.set(r.id,{id:r.id,level:clamp(Math.floor(finite(r.level)||1),1,3),gold:Math.max(0,Math.floor(finite(r.gold))),dir:r.dir===-1?-1:1,
+      cause:['lava','water','released'].includes(r.cause)?r.cause:'water',x:r.x,y:r.y,
+      anchorX:Number.isFinite(r.anchorX)?r.anchorX:r.x,age:Math.max(0,finite(r.age)),phase:finite(r.phase)});
+    minerId=Math.max(minerId,r.id)
+  }
+  const living=new Map((s?.minerLifeV42?.living||[]).map(r=>[r.id,r]));
+  for(const q of miners){const r=living.get(q.game.id);if(!r)continue;
+    q.game.waterMsV42=clamp(finite(r.water),0,MINER_AIR_V42);q.game.fireMsV42=clamp(finite(r.fire),0,MINER_FIRE_V42);q.game.reviveGraceV42=clamp(finite(r.grace),0,MINER_GRACE_V42)
+  }
+};
+var spiritBaseMinersV42=updateMiners;
+updateMiners=function(now){updateMinerLifeV42(now);spiritBaseMinersV42(now)};
+
+function artGhostV42(g,ghost){
+  const frame=Math.floor(ghost.age/180)%4,blink=ghost.age%4300>4110;
+  const edge='#555070',shade=ghost.cause==='lava'?'#b59aca':'#8fc7d0',light='#def7ed';
+  const r=(x,y,w,h,c)=>{g.fillStyle=c;g.fillRect(x,y,w,h)};
+  r(7,3,10,2,edge);r(4,5,16,3,edge);r(3,8,18,14,edge);r(4,22,16,3,edge);
+  r(7,5,10,2,light);r(5,7,14,13,light);r(4,11,16,9,light);r(5,20,14,4,shade);
+  r(5,9,2,11,'#b3dfdf');r(17,9,2,12,shade);
+  for(let i=0;i<3;i++){const h=3+(frame+i)%3;r(5+i*5,22,4,h,shade);r(6+i*5,22,2,h-1,light)}
+  r(7,11,3,blink?1:4,'#363951');r(14,11,3,blink?1:4,'#363951');
+  if(!blink){r(8,11,1,2,'#8adacb');r(15,11,1,2,'#8adacb')}r(11,17,2,3,edge);
+  // The pale miner's helmet keeps the worker's tier recognizable after death.
+  const helmet=ghost.level===1?'#e5cf91':ghost.level===2?'#c6a6dd':'#95ccda';
+  r(7,2,10,3,helmet);r(5,5,14,2,helmet);r(11,2,3,3,'#fff4b5');r(12,2,1,1,'#ffffff')
+}
+function drawSpiritsV42(now){
+  for(const ghost of minerGhostsV42.values()){
+    const s=w2s(ghost.x,ghost.y),scale=B/24*cam.z;if(s.x<-40||s.x>W+40||s.y<-60||s.y>HH+60)continue;
+    ctx.save();ctx.translate(s.x,s.y);ctx.scale(scale,scale);ctx.imageSmoothingEnabled=false;
+    const pulse=.5+.5*Math.sin(ghost.age/420);
+    ctx.fillStyle='#acbdf0';ctx.globalAlpha=.05+pulse*.045;ctx.fillRect(-16,-20,32,39);ctx.fillRect(-12,-24,24,47);
+    for(let i=0;i<4;i++){ctx.globalAlpha=.22*(1-i/5);ctx.fillStyle=i%2?'#c2a5e5':'#aee8dd';const y=14+i*5+(ghost.age/75)%5;ctx.fillRect(Math.round(Math.sin(ghost.age/360+i)*5),y,2,2)}
+    ctx.globalAlpha=(.78+pulse*.16)*clamp(ghost.age/250,.2,1);ctx.translate(-12,-14+Math.sin(ghost.age/350)*.6);artGhostV42(ctx,ghost);ctx.restore();
+    if(ghost.age<4000||spiritHoverV42&&ghostAtV42(s2w(spiritHoverV42.x,spiritHoverV42.y))===ghost){
+      ctx.save();ctx.font='bold 8px monospace';ctx.textAlign='center';ctx.fillStyle='#23263bdc';ctx.fillRect(s.x-47,s.y+23,94,14);ctx.fillStyle='#d2eee2';ctx.fillText('TAP TO REVIVE',s.x,s.y+33);ctx.restore()
+    }
+  }
+  for(const b of spiritBurstsV42){
+    const t=b.age/1000,origin=w2s(b.x,b.y);ctx.save();ctx.globalAlpha=clamp(1-b.age/850,0,1);
+    for(const p of b.pixels){ctx.fillStyle=p.color;const size=Math.max(1,p.size*cam.z);ctx.fillRect(Math.round(origin.x+p.vx*t*cam.z),Math.round(origin.y+(p.vy*t+28*t*t)*cam.z),size,size)}
+    if(b.kind==='revive'&&b.age<450){const radius=(5+b.age*.065)*cam.z;ctx.fillStyle='#fff2c2';
+      for(let i=0;i<16;i++){const a=i*Math.PI/8;ctx.fillRect(Math.round(origin.x+Math.cos(a)*radius),Math.round(origin.y+Math.sin(a)*radius),Math.max(2,3*cam.z),Math.max(2,3*cam.z))}
+    }
+    ctx.restore()
+  }
+}
+var spiritBaseGoldDrawV42=drawGoldBursts;
+drawGoldBursts=function(now){spiritBaseGoldDrawV42(now);drawSpiritsV42(now)};
+var spiritBaseMinerDrawV42=drawMiner;
+drawMiner=function(q,now){
+  spiritBaseMinerDrawV42(q,now);const g=q.game,s=w2s(q.position.x,q.position.y);
+  if(g.waterMsV42>0||g.fireMsV42>0){
+    const burning=g.fireMsV42>0,ratio=burning?g.fireMsV42/MINER_FIRE_V42:g.waterMsV42/MINER_AIR_V42;
+    ctx.save();ctx.fillStyle='#232438';ctx.fillRect(s.x-13,s.y-25,26,5);ctx.fillStyle=burning?'#f3ab72':'#a2e5e6';ctx.fillRect(s.x-12,s.y-24,24*(1-ratio),3);
+    for(let i=0;i<3;i++){const age=(now/50+i*7)%18;ctx.fillStyle=burning?(i%2?'#ffe3a1':'#ee8c70'):'#bdeeee';ctx.fillRect(s.x-8+i*7,s.y-7-age,2,2)}ctx.restore()
+  }
+  if(g.reviveGraceV42>0){ctx.save();ctx.strokeStyle='#b9f3d0';ctx.globalAlpha=.35+.3*Math.sin(now/100);ctx.lineWidth=2;ctx.strokeRect(s.x-B*.43*cam.z,s.y-B*.52*cam.z,B*.86*cam.z,B*1.04*cam.z);ctx.restore()}
+};
+c.addEventListener('pointermove',e=>{spiritHoverV42=pos(e)});c.addEventListener('pointerleave',()=>{spiritHoverV42=null});
+window.__skyStackSpiritDebug=()=>({ghosts:[...minerGhostsV42.values()].map(g=>({...g})),bursts:spiritBurstsV42.length,
+  living:[...miners].map(q=>({id:q.game.id,water:q.game.waterMsV42||0,fire:q.game.fireMsV42||0,grace:q.game.reviveGraceV42||0}))});

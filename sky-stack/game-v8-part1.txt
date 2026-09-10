@@ -52,6 +52,7 @@ function saveGame(){
     const workerData=[];for(const q of miners)workerData.push({id:q.game.id,level:q.game.level,gold:q.game.gold,dir:q.game.dir,x:q.position.x,y:q.position.y,angle:q.angle,vx:q.velocity.x,vy:q.velocity.y,av:q.angularVelocity});
     const s={v:1,savedAt:Date.now(),pickaxeTier,best,deepslateUnlocked:deepslate,inv:{...inv},deadMiners,restingMiners,removed:[...removedTerrain],damage:[...terrainDamage.entries()],placed,miners:workerData,cam:{x:cam.x,y:cam.y}};
     if(typeof saveTreesV41==='function')s.treesV41=saveTreesV41();
+    if(typeof saveMinerLifeV42==='function')s.minerLifeV42=saveMinerLifeV42();
     localStorage.setItem(SAVE_KEY,JSON.stringify(s));lastSavedAt=performance.now()
   }catch(e){console.warn('Save failed',e)}
 }

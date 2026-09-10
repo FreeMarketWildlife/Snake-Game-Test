@@ -65,7 +65,7 @@ $('minerUpgrade').addEventListener('click',e=>{e.stopPropagation();if(!selectedM
 $('minerKill').addEventListener('click',e=>{e.stopPropagation();if(!selectedMiner||!miners.has(selectedMiner))return;$('killGold').textContent=selectedMiner.game.gold;$('killModal').classList.add('show');$('killModal').setAttribute('aria-hidden','false');SkyAudio.ui()});
 $('minerMenu').addEventListener('pointerdown',e=>e.stopPropagation());
 $('killCancel').addEventListener('click',e=>{e.stopPropagation();$('killModal').classList.remove('show');$('killModal').setAttribute('aria-hidden','true');SkyAudio.ui()});
-$('killConfirm').addEventListener('click',e=>{e.stopPropagation();if(selectedMiner&&miners.has(selectedMiner)){const loot=selectedMiner.game.gold;inv.gold+=loot;World.remove(eng.world,selectedMiner);miners.delete(selectedMiner);deadMiners++;ui();saveSoon();toast(loot?'MINER GONE. +'+loot+' GOLD 💰':'MINER GONE.',true)}$('killModal').classList.remove('show');$('killModal').setAttribute('aria-hidden','true');closeMinerMenu();SkyAudio.ui()});
+$('killConfirm').addEventListener('click',e=>{e.stopPropagation();if(selectedMiner&&miners.has(selectedMiner)){const q=selectedMiner,loot=q.game.gold;inv.gold+=loot;q.game.gold=0;if(typeof minerDieV42==='function')minerDieV42(q,'released');else{World.remove(eng.world,q);miners.delete(q);deadMiners++;ui();saveSoon()}toast(loot?'GOLD CLAIMED: +'+loot+' · TAP THE GHOST TO REVIVE':'TAP THE GHOST TO REVIVE',true)}$('killModal').classList.remove('show');$('killModal').setAttribute('aria-hidden','true');closeMinerMenu();SkyAudio.ui()});
 $('killModal').addEventListener('pointerdown',e=>e.stopPropagation());
 
 $('bar').addEventListener('click',e=>{

@@ -74,6 +74,7 @@ main AI and the older nearby-mining helper retain lower-level material access.
 
 ## Trees
 
+
 Trees are one block wide, with 3–5 wood blocks and two leaf blocks at the top.
 Cutting a trunk releases every log above the cut as a dynamic Matter.js body.
 Detached leaves fade and disappear in 1–2 seconds without granting resources;
@@ -87,3 +88,19 @@ trees only on clear surface sites; chopped trees never regenerate on reload.
 Run `SKY_TEST_URL=http://127.0.0.1:8765/sky-stack/ node sky-stack/tests/trees-browser.test.cjs`
 with Playwright available. It covers generation, real-physics falls, valid body
 mass, leaf decay, soil removal, save restoration, harvesting and toolbar placement.
+
+## Miner ghosts
+
+The v42 layer checks actual filled liquid cells: submerged heads drain five seconds
+of air, while lava contact burns through 900 ms of tolerance. Surfacing restores
+air. Death removes the physical worker and creates a saved ghost retaining its
+identity, level and gold. Ghosts drift upward and sway, then hover above the world.
+Tapping one with any tool revives it at its current position with 2.2 seconds of
+protection. Manually released miners also leave ghosts, with already claimed gold
+removed from their pockets. Audio adds chord-matched ghost phrases and eighth-note
+death/revival cues to the existing score.
+
+Run `SKY_TEST_URL=http://127.0.0.1:8765/sky-stack/ node sky-stack/tests/spirits-browser.test.cjs`
+with Playwright available. It checks exposure, recovery, frame-rate independence,
+ghost drift, save/reload accounting, click revival, retained upgrades/gold,
+revival protection, drag/cancel behavior, manual releases and Web Audio cues.

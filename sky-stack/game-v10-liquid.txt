@@ -143,6 +143,7 @@ function saveGame(){
     const fluidData=[];for(const q of fluids)fluidData.push({kind:q.game.liquid,x:q.position.x,y:q.position.y,vx:q.velocity.x,vy:q.velocity.y});
     const s={v:1,savedAt:Date.now(),pickaxeTier,best,deepslateUnlocked:deepslate,inv:{...inv},deadMiners,restingMiners,removed:[...removedTerrain],damage:[...terrainDamage.entries()],placed,miners:workerData,cam:{x:cam.x,y:cam.y},fluidSeeded:[...fluidSeeded],revealedPockets:[...revealedPockets],fluids:fluidData,products};
     if(typeof saveTreesV41==='function')s.treesV41=saveTreesV41();
+    if(typeof saveMinerLifeV42==='function')s.minerLifeV42=saveMinerLifeV42();
     localStorage.setItem(SAVE_KEY,JSON.stringify(s));lastSavedAt=performance.now()
   }catch(e){console.warn('Save failed',e)}
 }
