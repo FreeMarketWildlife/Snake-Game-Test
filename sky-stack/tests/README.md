@@ -106,3 +106,14 @@ Run `SKY_TEST_URL=http://127.0.0.1:8765/sky-stack/ node sky-stack/tests/spirits-
 with Playwright available. It checks exposure, recovery, frame-rate independence,
 ghost drift, save/reload accounting, click revival, retained upgrades/gold,
 revival protection, drag/cancel behavior, manual releases and Web Audio cues.
+
+## Industry and musical automation
+
+Run `node sky-stack/tests/automation-audio.test.cjs` for the five-minute shared
+clock and crowded-machine mix test. With Playwright available and the repository
+served, run `SKY_TEST_URL=http://127.0.0.1:8765/sky-stack/ node sky-stack/tests/industry-browser.test.cjs`.
+This exercises real terrain harvesting and Furnace UI, saves and legacy migration,
+pause/auto-repeat, both ingots, frame-rate-independent production, mobile layout,
+shared camera attenuation, and live chord-matched Furnace audio.
+
+See `../INDUSTRY-V44.md` for file inventory, balance rules, behavior and limitations.

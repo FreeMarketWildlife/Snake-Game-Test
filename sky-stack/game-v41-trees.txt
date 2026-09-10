@@ -93,7 +93,7 @@ restoreDynamicState=function(s){
   for(const ch of s?.treesV41?.chunks||[])if(Number.isInteger(ch))treeChunksV41.add(ch);
   for(const r of s?.treesV41?.blocks||[]){
     if(!Number.isInteger(r.cx)||!Number.isInteger(r.cy)||!['wood','leaves'].includes(r.material))continue;
-    makeTreeBlockV41(r.cx,r.cy,r.material,'tree:'+r.cx,{
+    makeTreeBlockV41(r.cx,r.cy,r.material,typeof r.treeId==='string'&&/^tree:-?\d+$/.test(r.treeId)?r.treeId:'tree:'+r.cx,{
       attached:r.attached!==false,decay:r.decay,hits:Math.max(0,finite(r.hits)),
       x:finite(r.x),y:finite(r.y),angle:finite(r.angle),
       velocity:{x:finite(r.vx),y:finite(r.vy)},angularVelocity:finite(r.av)

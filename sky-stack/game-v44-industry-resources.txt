@@ -1,0 +1,164 @@
+// Industrial inventory and production extend the existing world and save.
+const RESOURCE_DEFS_V44={
+  coal:{name:'Coal',color:'#82929c',kind:'Raw'},
+  ironOre:{name:'Iron ore',color:'#dda783',kind:'Raw'},
+  copperOre:{name:'Copper ore',color:'#79c3ad',kind:'Raw'},
+  ironIngot:{name:'Iron ingot',color:'#dce6eb',kind:'Refined'},
+  copperIngot:{name:'Copper ingot',color:'#e6ad72',kind:'Refined'}
+};
+const ORE_DEFS_V44={
+  coal:{materials:['dirt','stone'],min:4,max:25,salt:4401,chance:.46,radius:2.6,amount:1},
+  ironOre:{materials:['stone'],min:8,max:27,salt:4411,chance:.42,radius:2.3,amount:1},
+  copperOre:{materials:['stone','deepslate'],min:14,max:35,salt:4421,chance:.38,radius:2.4,amount:1}
+};
+const RECIPES_V44={
+  ironIngot:{name:'Iron ingot',inputs:{ironOre:1,coal:1},outputs:{ironIngot:1},duration:4000},
+  copperIngot:{name:'Copper ingot',inputs:{copperOre:1,coal:1},outputs:{copperIngot:1},duration:4000}
+};
+const FURNACE_COST_V44={stone:10,wood:5};
+var industryV44={built:false,selected:'ironIngot',auto:false,paused:false,job:null};
+var industryTickV44=null,industryUiTickV44=0,oreBurstsV44=[];
+for(const name of Object.keys(RESOURCE_DEFS_V44))inv[name]=Math.max(0,Math.floor(finite(initialSave?.inv?.[name])));
+
+function oreAtV44(cx,cy,material){
+  // Independent salt per resource; one payload per base cell, small vein clusters.
+  const region=8,rx=Math.floor(cx/region),ry=Math.floor(cy/region);
+  for(const [type,d] of Object.entries(ORE_DEFS_V44)){
+    if(!d.materials.includes(material)||cy<d.min||cy>d.max)continue;
+    for(let oy=-1;oy<=1;oy++)for(let ox=-1;ox<=1;ox++){
+      const x=rx+ox,y=ry+oy;if(hash01(x,y,d.salt)>d.chance)continue;
+      const px=x*region+1+Math.floor(hash01(x,y,d.salt+1)*6),py=y*region+1+Math.floor(hash01(x,y,d.salt+2)*6);
+      const distance=Math.hypot(cx-px,cy-py);
+      if(distance<=d.radius&&hash01(cx,cy,d.salt+3)<(distance<1.3?.9:.5))return{type,amount:d.amount+(type==='ironOre'&&cy>=16&&hash01(cx,cy,d.salt+4)<.25?1:0)};
+    }
+  }
+  return null;
+}
+function markOreV44(z){
+  if(!z.game.terrain||z.game.worldProduct)return z;
+  const ore=oreAtV44(z.game.cx,z.game.cy,z.game.material);
+  if(ore){z.game.resourceType=ore.type;z.game.resourceAmount=ore.amount}return z;
+}
+const industryMkV44=mk;
+mk=function(...args){return markOreV44(industryMkV44(...args))};
+for(const z of bs)markOreV44(z);
+function grantResourceV44(type,amount,source={}){
+  if(!RESOURCE_DEFS_V44[type]||!Number.isFinite(amount)||amount<=0)return false;
+  inv[type]+=Math.floor(amount);
+  if(Number.isFinite(source.x)&&Number.isFinite(source.y)){
+    const now=performance.now(),last=oreBurstsV44.find(b=>b.type===type&&now-b.born<350&&Math.hypot(b.x-source.x,b.y-source.y)<B*3);
+    if(last)last.amount+=amount;else{oreBurstsV44.push({type,amount,x:source.x,y:source.y,born:now});if(oreBurstsV44.length>12)oreBurstsV44.shift()}
+  }
+  return true;
+}
+const industryHarvestV44=harvest;
+harvest=function(z,collector='player',miner=null){
+  if(!z?.game||!bs.has(z))return 0;
+  if(z.game.terrain&&!z.game.worldProduct&&z.game.material!=='bedrock'&&z.game.resourceType){
+    grantResourceV44(z.game.resourceType,z.game.resourceAmount,{kind:collector,x:z.position.x,y:z.position.y});
+  }
+  // Base harvesting still owns material, gold, diamond, liquid and save behavior.
+  return industryHarvestV44(z,collector,miner);
+};
+const industryDrawV44=draw;
+draw=function(z){
+  industryDrawV44(z);const type=z.game.resourceType;
+  if(!type||!z.game.terrain||!terrainExposed(z))return;
+  const s=w2s(z.position.x,z.position.y);if(s.x<-B*cam.z||s.x>W+B*cam.z||s.y<-B*cam.z||s.y>HH+B*cam.z)return;
+  ctx.save();ctx.translate(s.x,s.y);ctx.rotate(z.angle);ctx.scale(cam.z,cam.z);
+  const color=RESOURCE_DEFS_V44[type].color;
+  for(let i=0;i<5;i++){
+    const x=-10+Math.floor(hash01(z.game.cx,i,4451)*20),y=-10+Math.floor(hash01(z.game.cy,i,4452)*20);
+    ctx.fillStyle='#232736';ctx.fillRect(x-1,y-1,6,5);ctx.fillStyle=type==='coal'?'#35404b':color;ctx.fillRect(x,y,4,3);ctx.fillStyle=color;ctx.fillRect(x,y,2,1);
+  }
+  ctx.restore();
+};
+const industryBurstsV44=drawGoldBursts;
+drawGoldBursts=function(now){
+  industryBurstsV44(now);oreBurstsV44=oreBurstsV44.filter(b=>now-b.born<1100);
+  for(const b of oreBurstsV44){const age=(now-b.born)/1100,s=w2s(b.x,b.y);ctx.save();ctx.globalAlpha=1-age;ctx.font='bold 10px monospace';ctx.textAlign='center';ctx.fillStyle=RESOURCE_DEFS_V44[b.type].color;ctx.strokeStyle='#222431';ctx.lineWidth=3;const label='+'+b.amount+' '+RESOURCE_DEFS_V44[b.type].name.toUpperCase();ctx.strokeText(label,s.x,s.y-10-age*25);ctx.fillText(label,s.x,s.y-10-age*25);ctx.restore()}
+};
+function canPayIndustryV44(cost){return Object.entries(cost).every(([type,n])=>(inv[type]||0)>=n)}
+function payIndustryV44(cost){if(!canPayIndustryV44(cost))return false;for(const [type,n] of Object.entries(cost))inv[type]-=n;return true}
+function buildFurnaceV44(){
+  if(industryV44.built||!payIndustryV44(FURNACE_COST_V44))return false;
+  industryV44.built=true;ui();saveGame();SkyAudio.ui();return true;
+}
+function startFurnaceV44(){
+  const f=industryV44,r=RECIPES_V44[f.selected];
+  if(!f.built||f.job||f.paused||!r||!payIndustryV44(r.inputs))return false;
+  f.job={recipe:f.selected,remaining:r.duration};industryTickV44=performance.now();ui();saveGame();return true;
+}
+function stepIndustryV44(elapsed){
+  const f=industryV44;if(!f.built||f.paused)return false;let changed=false,budget=Math.max(0,finite(elapsed));
+  // Preserve the fractional frame left after a batch completes. Production time
+  // stays consistent at 30/60/144 FPS without tying it to musical subdivisions.
+  if(!f.job)budget=0;
+  for(let batches=0;batches<64;batches++){
+    if(!f.job&&f.auto){const r=RECIPES_V44[f.selected];if(payIndustryV44(r.inputs)){f.job={recipe:f.selected,remaining:r.duration};changed=true}}
+    if(!f.job)break;
+    const used=Math.min(f.job.remaining,budget);f.job.remaining-=used;budget-=used;
+    if(f.job.remaining>1e-7)break;
+    const r=RECIPES_V44[f.job.recipe];for(const [type,n] of Object.entries(r.outputs))grantResourceV44(type,n,{kind:'production'});f.job=null;changed=true;
+  }
+  return changed;
+}
+function updateIndustryV44(now){
+  const elapsed=industryTickV44===null?0:Math.max(0,now-industryTickV44);industryTickV44=now;
+  if(document.hidden)return;
+  // No offline catch-up and no accumulated production after a suspended frame.
+  const changed=stepIndustryV44(elapsed<=1500?elapsed:0);
+  if(changed){ui();saveGame()}
+  if(now-industryUiTickV44>100){industryUiTickV44=now;refreshIndustryV44()}
+}
+const industryMinersV44=updateMiners;
+updateMiners=function(now){industryMinersV44(now);updateIndustryV44(now)};
+document.addEventListener('visibilitychange',()=>{industryTickV44=null});
+function saveIndustryV44(){return industryV44?{...industryV44,job:industryV44.job?{...industryV44.job}:null,savedAt:Date.now()}:initialSave?.industryV44}
+const industryRestoreV44=restoreDynamicState;
+restoreDynamicState=function(s){
+  industryRestoreV44(s);const f=s?.industryV44;
+  if(f){industryV44.built=f.built===true;industryV44.selected=Object.hasOwn(RECIPES_V44,f.selected)?f.selected:'ironIngot';industryV44.auto=f.auto===true;industryV44.paused=f.paused===true;
+    const r=f.job&&Object.hasOwn(RECIPES_V44,f.job.recipe)&&RECIPES_V44[f.job.recipe];if(industryV44.built&&r&&Number.isFinite(f.job.remaining))industryV44.job={recipe:f.job.recipe,remaining:clamp(f.job.remaining,0,r.duration)};
+  }
+  industryTickV44=null;
+};
+function refreshIndustryV44(){
+  const f=industryV44,panel=$('industryPanel');if(!panel)return;
+  $('industryOpen').dataset.active=String(!!f.job&&!f.paused);
+  if(!panel.open)return;
+  for(const type of Object.keys(RESOURCE_DEFS_V44))$('resource-'+type).textContent=inv[type];
+  $('furnaceBuild').hidden=f.built;$('furnaceControls').hidden=!f.built;
+  $('furnaceBuild').disabled=!canPayIndustryV44(FURNACE_COST_V44);
+  $('furnaceCost').textContent=f.built?'Furnace built · ready to smelt':'Build: 10 stone ('+inv.stone+') + 5 wood ('+inv.wood+')';
+  const selected=RECIPES_V44[f.selected],active=f.job&&RECIPES_V44[f.job.recipe];
+  $('furnaceRecipe').value=f.selected;$('furnaceRecipe').disabled=!!f.job;
+  $('furnaceIngredients').textContent=Object.entries(selected.inputs).map(([k,n])=>n+' '+RESOURCE_DEFS_V44[k].name).join(' + ')+' → 1 '+selected.name+' · '+selected.duration/1000+' seconds';
+  $('furnaceAuto').checked=f.auto;$('furnaceProduce').disabled=!!f.job||f.paused||!canPayIndustryV44(selected.inputs);
+  $('furnacePause').disabled=!f.job&&!f.auto;$('furnacePause').textContent=f.paused?'RESUME':'PAUSE';
+  $('furnaceProgress').value=f.job?1-f.job.remaining/active.duration:0;
+  const missing=Object.entries(selected.inputs).filter(([k,n])=>inv[k]<n).map(([k])=>RESOURCE_DEFS_V44[k].name).join(' and ');
+  $('furnaceStatus').textContent=f.paused?'Paused · inputs reserved':f.job?'Smelting '+active.name+' · '+(f.job.remaining/1000).toFixed(1)+'s':f.auto?'Waiting for '+missing+' · resumes automatically':missing?'Need '+missing:'Ready to produce';
+}
+const industryUiV44=ui;ui=function(){industryUiV44();refreshIndustryV44()};
+$('industryOpen').onclick=()=>{gesture=null;pointers.clear();$('tips').classList.remove('show');$('industryPanel').showModal();refreshIndustryV44();SkyAudio.ui()};
+$('industryClose').onclick=()=>$('industryPanel').close();
+$('industryPanel').addEventListener('close',()=>$('industryOpen').focus());
+$('furnaceBuild').onclick=buildFurnaceV44;
+$('furnaceProduce').onclick=startFurnaceV44;
+$('furnaceRecipe').onchange=e=>{if(!industryV44.job&&Object.hasOwn(RECIPES_V44,e.target.value)){industryV44.selected=e.target.value;ui();saveGame()}};
+$('furnaceAuto').onchange=e=>{industryV44.auto=e.target.checked;ui();saveGame()};
+$('furnacePause').onclick=()=>{industryV44.paused=!industryV44.paused;industryTickV44=null;ui();saveGame()};
+
+// Future positioned machinery uses the same viewport falloff as physical miners.
+const worldMachinesV44=new Map();
+window.SkyMachines={
+  update(id,state){if(typeof id==='string'&&state&&Number.isFinite(state.x)&&Number.isFinite(state.y))worldMachinesV44.set(id,{...state,id})},
+  remove(id){worldMachinesV44.delete(id)},
+  spatial:worldAudioSpatialV44
+};
+window.SkyAudio?.setMachineSource?.(()=>[
+  {id:'global-furnace',type:'furnace',global:true,active:!!industryV44.job&&!industryV44.paused,gain:.6,pan:0},
+  ...[...worldMachinesV44.values()].filter(m=>Number.isFinite(m.x)&&Number.isFinite(m.y)).map(m=>({...m,...worldAudioSpatialV44(m.x,m.y)}))
+]);
+window.__skyStackIndustryDebug=()=>({inventory:Object.fromEntries(Object.keys(RESOURCE_DEFS_V44).map(k=>[k,inv[k]])),furnace:saveIndustryV44(),ores:ORE_DEFS_V44,audio:window.__skyStackAudioDebug?.().automation});

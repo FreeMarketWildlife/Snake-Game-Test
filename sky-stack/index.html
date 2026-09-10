@@ -15,6 +15,7 @@
   <link rel="stylesheet" href="style-v32-art.css?v=32">
   <link rel="stylesheet" href="style-v39-pickaxe.css?v=39">
   <link rel="stylesheet" href="style-v41-trees.css?v=41">
+  <link rel="stylesheet" href="style-v44-industry.css?v=44">
 </head>
 <body>
 <div id="app">
@@ -59,6 +60,9 @@
       <details><summary>MINER GHOSTS <span>Hazards and revival</span></summary><div class="tipBody">
         <p>Miners drown after 5 seconds with their head underwater, or burn after a short stay in lava. Watch their air and heat bars.</p><p>Their ghosts sway upward with a spooky melody. Tap a ghost with any tool to revive the miner right there in a burst of pixels, keeping its level and pocket gold.</p><p>Revived miners have a brief protective shield. Ghosts wait above the world and save with your game. Gold claimed through the miner menu stays in your inventory.</p>
       </div></details>
+      <details><summary>INDUSTRY <span>Ore deposits and smelting</span></summary><div class="tipBody">
+        <p>Exposed terrain can show coal, iron, or copper flecks. Break it to collect both the block and its ore. Miners can mine deposits whenever they can mine the base material.</p><p>Open INDUSTRY to build a Furnace for 10 stone and 5 wood. Each ingot takes one ore, one coal, and four seconds. Auto-repeat waits for supplies; Pause holds the current batch.</p><p>Ore and ingots are stored resources, not tower blocks. Production pauses while you are away. Active Furnaces add a quiet musical pulse to the soundtrack.</p>
+      </div></details>
       <details><summary>TREES <span>Wood, leaves, falling trunks</span></summary><div class="tipBody">
         <p>Wood takes two hits to chop. Every trunk block above the cut falls with gravity; you can mine the fallen logs too.</p><p>Unsupported leaves disappear in 1–2 seconds. Mine them first to collect leaf blocks.</p><p>Use WOOD and LEAVES in the toolbar to build. Placed leaf blocks stay put. On phones, swipe the toolbar to see every material.</p>
       </div></details>
@@ -73,6 +77,25 @@
   </div>
 
   <button class="btn" id="pickaxeUpgrade" aria-haspopup="dialog" aria-controls="pickaxeShop">UPGRADE PICK · 5 GOLD</button>
+  <button class="btn" id="industryOpen" aria-haspopup="dialog" aria-controls="industryPanel">⚙ INDUSTRY</button>
+  <dialog id="industryPanel" class="box" aria-labelledby="industryTitle">
+    <header><div><small>FROM THE MINE TO THE FURNACE</small><h2 id="industryTitle">INDUSTRY</h2></div><button class="btn" id="industryClose" aria-label="Close Industry">✕</button></header>
+    <section aria-label="Industrial resources"><h3>RESOURCES</h3><div class="industryResources">
+      <div class="resourceCard coal"><span class="oreIcon" aria-hidden="true"></span><span>Coal<small>Furnace fuel</small></span><b id="resource-coal">0</b></div>
+      <div class="resourceCard ironOre"><span class="oreIcon" aria-hidden="true"></span><span>Iron ore<small>Raw mineral</small></span><b id="resource-ironOre">0</b></div>
+      <div class="resourceCard copperOre"><span class="oreIcon" aria-hidden="true"></span><span>Copper ore<small>Raw mineral</small></span><b id="resource-copperOre">0</b></div>
+      <div class="resourceCard ironIngot"><span class="oreIcon ingot" aria-hidden="true"></span><span>Iron ingot<small>Refined metal</small></span><b id="resource-ironIngot">0</b></div>
+      <div class="resourceCard copperIngot"><span class="oreIcon ingot" aria-hidden="true"></span><span>Copper ingot<small>Refined metal</small></span><b id="resource-copperIngot">0</b></div>
+    </div></section>
+    <section class="furnaceCard" aria-labelledby="furnaceTitle"><h3 id="furnaceTitle"><span aria-hidden="true">▣</span> FURNACE</h3><p id="furnaceCost"></p><button class="btn primary" id="furnaceBuild">BUILD FURNACE · 10 STONE + 5 WOOD</button>
+      <div id="furnaceControls" hidden><label for="furnaceRecipe">PRODUCE</label><select id="furnaceRecipe"><option value="ironIngot">Iron ingot</option><option value="copperIngot">Copper ingot</option></select><p id="furnaceIngredients"></p>
+        <progress id="furnaceProgress" max="1" value="0" aria-label="Smelting progress"></progress><p id="furnaceStatus" role="status"></p>
+        <div class="furnaceActions"><button class="btn primary" id="furnaceProduce">PRODUCE</button><button class="btn" id="furnacePause">PAUSE</button><label class="autoToggle"><input type="checkbox" id="furnaceAuto"> AUTO-REPEAT</label></div>
+        <p class="industryNote">Inputs are reserved when a batch starts. Auto-repeat waits for supplies; switch it off to finish the current batch only.</p>
+      </div>
+    </section>
+    <p class="industryNote">Progress saves with your world and pauses while you are away. Refined metals are stored for future industry upgrades.</p>
+  </dialog>
   <div id="bar">
     <button class="slot" data-tool="move"><span class="icon">✋</span><span>MOVE</span></button>
     <button class="slot sel" data-tool="pick"><span class="icon">⛏</span><span id="pickaxeLabel">STONE 1×1</span></button>
@@ -115,7 +138,7 @@
   <div id="toast" class="hide"></div><div id="load">Loading physics…</div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/matter-js@0.20.0/build/matter.min.js"></script>
-<script src="audio.js?v=43"></script>
-<script src="game-v28.js?v=43"></script>
+<script src="audio.js?v=44"></script>
+<script src="game-v28.js?v=44"></script>
 </body>
 </html>

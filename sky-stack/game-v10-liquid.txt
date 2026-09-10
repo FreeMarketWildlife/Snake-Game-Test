@@ -144,6 +144,7 @@ function saveGame(){
     const s={v:1,savedAt:Date.now(),pickaxeTier,best,deepslateUnlocked:deepslate,inv:{...inv},deadMiners,restingMiners,removed:[...removedTerrain],damage:[...terrainDamage.entries()],placed,miners:workerData,cam:{x:cam.x,y:cam.y},fluidSeeded:[...fluidSeeded],revealedPockets:[...revealedPockets],fluids:fluidData,products};
     if(typeof saveTreesV41==='function')s.treesV41=saveTreesV41();
     if(typeof saveMinerLifeV42==='function')s.minerLifeV42=saveMinerLifeV42();
+    if(typeof saveIndustryV44==='function')s.industryV44=saveIndustryV44();
     localStorage.setItem(SAVE_KEY,JSON.stringify(s));lastSavedAt=performance.now()
   }catch(e){console.warn('Save failed',e)}
 }

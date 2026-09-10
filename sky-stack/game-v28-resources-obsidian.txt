@@ -101,11 +101,12 @@ harvest=function(z,collector='player',miner=null){
     if(z.game.material==='deepslate'&&!deepslate){deepslate=true;toast('★ DEEPSLATE DISCOVERED! ★',true);SkyAudio.unlock()}
     if(gold>0){
       if(collector==='miner'&&miner){
+        const sp=minerSpatialV27(miner);SkyAudio.goldChaching?.(sp.gain,sp.pan);
         if(miner.game.level>=3){
           const share=Math.ceil(gold/2),kept=gold-share;inv.gold+=share;miner.game.gold+=kept;
           if(share>0)goldBurst(z.position.x,z.position.y,share,false)
         }else{
-          miner.game.gold+=gold;goldBurst(z.position.x,z.position.y,gold,true);const sp=minerSpatialV27(miner);SkyAudio.goldChaching?.(sp.gain,sp.pan)
+          miner.game.gold+=gold;goldBurst(z.position.x,z.position.y,gold,true)
         }
       }else{inv.gold+=gold;goldBurst(z.position.x,z.position.y,gold,false);toast('★ GOLD! +'+gold+' ★',true)}
     }

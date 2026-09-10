@@ -3,11 +3,11 @@
 
 const coreParts=[
   'game-v8-part0.txt?v=41',
-  'game-v8-part1.txt?v=42',
+  'game-v8-part1.txt?v=44',
   'game-v8-part2.txt?v=42'
 ];
 const liquidParts=[
-  'game-v10-liquid.txt?v=42',
+  'game-v10-liquid.txt?v=44',
   'game-v10-liquid-fixes.txt?v=28',
   'game-v13-liquid-visibility.txt?v=28',
   'game-v14-liquid-guarantee.txt?v=28',
@@ -23,15 +23,16 @@ const liquidParts=[
 const cameraUrl='game-v24-camera-bounce.txt?v=28';
 const gridUrl='game-v25-grid-toggle.txt?v=41';
 const zoomUrl='game-v26-zoom-input.txt?v=28';
-const minerUrl='game-v27-miner-ai-rhythm.txt?v=43';
-const resourceUrl='game-v28-resources-obsidian.txt?v=43';
+const minerUrl='game-v27-miner-ai-rhythm.txt?v=44';
+const resourceUrl='game-v28-resources-obsidian.txt?v=44';
 const liquidFeelUrl='game-v29-liquid-feel.txt?v=29';
 const devPanelUrl='game-v30-dev-panel.txt?v=30';
 const obsidianArtUrl='game-v31-obsidian-art.txt?v=31';
 const artDirectionUrl='game-v32-art-direction.txt?v=41';
 const pickaxeUrl='game-v39-pickaxe.txt?v=39';
-const treesUrl='game-v41-trees.txt?v=41';
+const treesUrl='game-v41-trees.txt?v=44';
 const spiritsUrl='game-v42-miner-ghosts.txt?v=43';
+const industryUrl='game-v44-industry-resources.txt?v=44';
 const tailUrl='game-v8-part3.txt?v=42';
 
 async function read(url){
@@ -63,9 +64,10 @@ async function read(url){
     const pickaxe=await read(pickaxeUrl);
     const trees=await read(treesUrl);
     const spirits=await read(spiritsUrl);
+    const industry=await read(industryUrl);
     const marker='restoreDynamicState(initialSave);';
     if(!tail.includes(marker))throw new Error('v28 insertion marker missing');
-    tail=tail.replace(marker,camera+'\n'+grid+'\n'+zoom+'\n'+miner+'\n'+resources+'\n'+liquidFeel+'\n'+devPanel+'\n'+obsidianArt+'\n'+artDirection+'\n'+pickaxe+'\n'+trees+'\n'+spirits+'\n'+marker);
+    tail=tail.replace(marker,camera+'\n'+grid+'\n'+zoom+'\n'+miner+'\n'+resources+'\n'+liquidFeel+'\n'+devPanel+'\n'+obsidianArt+'\n'+artDirection+'\n'+pickaxe+'\n'+trees+'\n'+spirits+'\n'+industry+'\n'+marker);
 
     const src=core+'\n});\n'+liquid+'\n'+tail;
     (0,eval)(src);
