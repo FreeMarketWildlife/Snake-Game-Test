@@ -105,7 +105,7 @@ harvest=function(z,collector='player',miner=null){
           const share=Math.ceil(gold/2),kept=gold-share;inv.gold+=share;miner.game.gold+=kept;
           if(share>0)goldBurst(z.position.x,z.position.y,share,false)
         }else{
-          miner.game.gold+=gold;goldBurst(z.position.x,z.position.y,gold,true);toast('YOUR MINER FOUND GOLD...\nAND POCKETED IT 👀',true)
+          miner.game.gold+=gold;goldBurst(z.position.x,z.position.y,gold,true);const sp=minerSpatialV27(miner);SkyAudio.goldChaching?.(sp.gain,sp.pan)
         }
       }else{inv.gold+=gold;goldBurst(z.position.x,z.position.y,gold,false);toast('★ GOLD! +'+gold+' ★',true)}
     }

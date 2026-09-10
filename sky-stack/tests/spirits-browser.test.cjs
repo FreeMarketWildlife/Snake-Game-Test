@@ -7,7 +7,7 @@ const {chromium}=require('playwright'),assert=require('node:assert/strict');
   await page.route('**/game-v8-part3.txt*',async route=>{
    const response=await route.fetch(),source=await response.text();
    const hook=`window.spiritTest={miners,bs,eng,Engine,Body,inv,ghosts:minerGhostsV42,spawn:createMinerAt,die:minerDieV42,revive:reviveGhostAtV42,
-    tick:updateMinerLifeV42,updateMiners,exposure:minerExposureV42,save:saveGame,screen:w2s,open:openMinerMenu,
+    tick:updateMinerLifeV42,updateMiners,exposure:minerExposureV42,save:saveGame,screen:w2s,open:openMinerMenu,mk,deaths:minerDeathsV43,
     get dead(){return deadMiners},get resting(){return restingMiners.length},get bursts(){return spiritBurstsV42},
     zoom(z){cam.z=z},tool(t){tool=t},
     reset(){World.clear(eng.world,false);Engine.clear(eng);bs.clear();grid.clear();miners.clear();minerGhostsV42.clear();spiritBurstsV42=[];spiritLastTickV42=null;liquidSubV22.clear();removedTerrain.clear();restingMiners.length=0;deadMiners=0;best=20;inv.gold=0;cam.x=0;cam.y=20;cam.z=2;gesture=null;ui()},
@@ -19,6 +19,19 @@ const {chromium}=require('playwright'),assert=require('node:assert/strict');
   });
   const url=process.env.SKY_TEST_URL||'http://127.0.0.1:8767/sky-stack/';
   const load=async()=>{await page.goto(url);await page.waitForFunction(()=>window.spiritTest,null,{polling:100})};await load();
+  await page.evaluate(()=>{
+    const t=spiritTest;t.reset();const q=t.spawn(0,0,{id:910,level:2,gold:4});
+    t.mk(0,32,'stone',{static:true,w:300,h:32});
+    const block=t.mk(0,-100,'stone',{placed:true});t.Body.setVelocity(block,{x:0,y:11});
+    for(let i=0;i<35;i++)t.Engine.update(t.eng,1000/60);
+    if(t.miners.has(q)||!t.ghosts.has(910)||t.deaths.get(910)!==1)throw Error('Falling block failed to kill miner and count death');
+    const ghost=t.ghosts.get(910);t.revive({x:ghost.x,y:ghost.y});
+    const revived=[...t.miners][0];t.open(revived);
+    if(!document.getElementById('minerGold').textContent.includes('DEATHS: 1'))throw Error('Death counter missing from UI');
+    t.save();const saved=JSON.parse(localStorage.getItem('skyStack.save.v1'));
+    if(!saved.minerLifeV42.deaths.some(([id,n])=>id===910&&n===1))throw Error('Death counter not saved');
+    t.reset();
+  });console.log('PASS actual falling-block impact, death count, revival UI and persistence');
   const results=await page.evaluate(()=>{
    const t=spiritTest,out=[],check=(ok,label)=>{if(!ok)throw Error(label);out.push(label)};
    let now=0;const step=(ms,hz=60)=>{for(let i=0;i<Math.ceil(ms/(1000/hz));i++){now+=1000/hz;t.tick(now)}};
@@ -80,7 +93,7 @@ const {chromium}=require('playwright'),assert=require('node:assert/strict');
   await page.evaluate(p=>{const c=document.getElementById('game');for(const type of ['pointerdown','pointercancel'])c.dispatchEvent(new PointerEvent(type,{pointerId:72,pointerType:'touch',clientX:p.x,clientY:p.y,bubbles:true,cancelable:true}))},point);
   assert.equal(await page.evaluate(()=>spiritTest.ghosts.size),1);await page.mouse.click(point.x,point.y);assert.equal(await page.evaluate(()=>spiritTest.ghosts.size),0);
   console.log('PASS tap-to-revive with Move selected, without accidental revival during drag/cancel');
-  await page.evaluate(async()=>{await SkyAudio.ensure();SkyAudio.setGhostPresence(.8,.2);SkyAudio.spiritCue('death',.8,.2);SkyAudio.spiritCue('revive',.8,.2)});
+  await page.evaluate(async()=>{await SkyAudio.ensure();SkyAudio.setGhostPresence(.8,.2);SkyAudio.spiritCue('death',.8,.2);SkyAudio.spiritCue('revive',.8,.2);SkyAudio.goldChaching();SkyAudio.hit('stone');SkyAudio.minerHit('stone',.7,0,true)});
   await page.waitForTimeout(1800);assert.ok(await page.evaluate(()=>__skyStackAudioDebug().spiritCues)>=2);
   assert.deepEqual(errors,[]);console.log('PASS real Web Audio ghost/revival cues and no runtime errors');
  }finally{await browser.close()}

@@ -40,9 +40,18 @@ function toneAt(freq,t,d=.08,v=.08,type='triangle',slide=0,bus=sfx,pan=0){if(!re
 function tone(freq,d=.08,v=.08,type='triangle',slide=0){if(ready)toneAt(freq,ac.currentTime,d,v,type,slide)}
 function noiseAt(t,d=.18,v=.04,cut=1800,pan=0){if(!ready)return;const src=ac.createBufferSource(),f=ac.createBiquadFilter(),g=ac.createGain();src.buffer=makeNoise(Math.max(.25,d));f.type='lowpass';f.frequency.value=cut;env(g,t,.006,Math.max(.0001,v),d);src.connect(f);f.connect(g);route(g,sfx,pan);src.start(t);src.stop(t+d+.02)}
 function noise(d=.18,v=.04,cut=1800){if(ready)noiseAt(ac.currentTime,d,v,cut)}
-function hit(material,broken=false){if(!ready)return;const midi={dirt:43,stone:52,deepslate:40,obsidian:35}[material]||43;voice(midi,ac.currentTime,broken?.2:.09,broken?.1:.065,'triangle',sfx,0,0,material==='dirt'?700:1200);if(broken)noise(.12,.025,material==='dirt'?650:1800)}
+function stoneStrike(broken,gain=1,pan=0){
+ const t=ac.currentTime,d=broken?.24:.085;
+ const buffer=ac.createBuffer(1,Math.ceil(ac.sampleRate*d),ac.sampleRate),samples=buffer.getChannelData(0);
+ for(let i=0;i<samples.length;i++)samples[i]=Math.random()*2-1;
+ const source=ac.createBufferSource(),filter=ac.createBiquadFilter(),g=ac.createGain();source.buffer=buffer;filter.type='highpass';filter.frequency.value=broken?1100:2400;
+ env(g,t,.002,(broken?.12:.06)*gain,d);source.connect(filter);filter.connect(g);route(g,sfx,pan);source.start(t);source.stop(t+d+.02);
+ voice(broken?50:67,t,broken?.16:.045,.055*gain,'triangle',sfx,pan,0,3000)
+}
+function goldChaching(gain=1,pan=0){if(!ready)return;const t=ac.currentTime;[86,98,93].forEach((n,i)=>voice(n,t+i*.075,.24,.05*gain,'triangle',sfx,pan,0,6500))}
+function hit(material,broken=false){if(!ready)return;if(material==='stone')return stoneStrike(broken);const midi={dirt:43,deepslate:40,obsidian:35}[material]||43;voice(midi,ac.currentTime,broken?.2:.09,broken?.1:.065,'triangle',sfx,0,0,material==='dirt'?700:1200);if(broken)noise(.12,.025,material==='dirt'?650:1800)}
 function rhythm(){if(!ready||ac.state!=='running')return{ready:false,bpm:BPM,beatMs:beat*1000,beatIndex:-1,barBeat:0,phase:0};const pos=(ac.currentTime-beatOrigin)/beat,index=Math.floor(pos);return{ready:true,bpm:BPM,beatMs:beat*1000,beatIndex:index,barBeat:((index%4)+4)%4,phase:pos-index}}
-function minerHit(material,gain=1,pan=0,broken=false){if(!ready||gain<.012)return;const midi=material==='dirt'?43:material==='stone'?52:material==='deepslate'?40:35;voice(midi,ac.currentTime,.12,.055*Math.min(1,gain),'triangle',sfx,pan,0,900);if(broken)noiseAt(ac.currentTime,.1,.02*gain,1300,pan)}
+function minerHit(material,gain=1,pan=0,broken=false){if(!ready||gain<.012)return;if(material==='stone')return stoneStrike(broken,gain,pan);const midi=material==='dirt'?43:material==='deepslate'?40:35;voice(midi,ac.currentTime,.12,.055*Math.min(1,gain),'triangle',sfx,pan,0,900);if(broken)noiseAt(ac.currentTime,.1,.02*gain,1300,pan)}
 // Breath-like, gently detuned ghost notes follow the score's actual chord and
 // eighth-note grid. Nearby ghosts add a sparse counter-melody to each music bar.
 function ghostVoice(midi,t,d,v,pan){
@@ -76,7 +85,7 @@ function splash(kind='water'){if(!ready||performance.now()-lastSplash<180)return
 function sizzle(){if(!ready||performance.now()-lastSizzle<120)return;lastSizzle=performance.now();noise(.24,.045,3000);tone(170,.16,.03,'triangle',90)}
 async function ensure(){if(ready){if(ac.state==='suspended')try{await ac.resume()}catch{};return}try{const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;ac=new AC();const master=ac.createGain(),comp=ac.createDynamicsCompressor();music=ac.createGain();sfx=ac.createGain();ambience=ac.createGain();master.gain.value=.76;music.gain.value=.43;sfx.gain.value=.9;ambience.gain.value=.11;music.connect(master);sfx.connect(master);ambience.connect(master);master.connect(comp);comp.connect(ac.destination);await ac.resume();ready=true;start();startAmbience();setInterval(scheduleBirds,9000)}catch(e){console.warn('Audio start failed',e)}}
 document.addEventListener('pointerdown',ensure,{capture:true});document.addEventListener('keydown',ensure,{capture:true});document.addEventListener('visibilitychange',()=>{if(document.hidden){clearInterval(timer);timer=null}else if(ready)ac.resume().then(start).catch(()=>{})});
-window.SkyAudio={ensure,hit,minerHit,rhythm,place,unlock,ui,splash,sizzle,spiritCue,setGhostPresence,bpm:BPM};
+window.SkyAudio={ensure,hit,minerHit,rhythm,place,unlock,ui,splash,sizzle,spiritCue,setGhostPresence,goldChaching,bpm:BPM};
 window.__skyStackAudioDebug=()=>({ready,bpm:BPM,bar,scoreBars:SONG.length,midiOnly:true,wind:!!windSource,musicGain:music?.gain?.value??null,ambienceGain:ambience?.gain?.value??null,ghostMix,spiritCues});
 document.documentElement.dataset.audioEngine='midi-ready';
 })();

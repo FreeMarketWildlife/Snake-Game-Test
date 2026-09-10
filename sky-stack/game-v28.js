@@ -23,15 +23,15 @@ const liquidParts=[
 const cameraUrl='game-v24-camera-bounce.txt?v=28';
 const gridUrl='game-v25-grid-toggle.txt?v=41';
 const zoomUrl='game-v26-zoom-input.txt?v=28';
-const minerUrl='game-v27-miner-ai-rhythm.txt?v=41';
-const resourceUrl='game-v28-resources-obsidian.txt?v=36';
+const minerUrl='game-v27-miner-ai-rhythm.txt?v=43';
+const resourceUrl='game-v28-resources-obsidian.txt?v=43';
 const liquidFeelUrl='game-v29-liquid-feel.txt?v=29';
 const devPanelUrl='game-v30-dev-panel.txt?v=30';
 const obsidianArtUrl='game-v31-obsidian-art.txt?v=31';
 const artDirectionUrl='game-v32-art-direction.txt?v=41';
 const pickaxeUrl='game-v39-pickaxe.txt?v=39';
 const treesUrl='game-v41-trees.txt?v=41';
-const spiritsUrl='game-v42-miner-ghosts.txt?v=42';
+const spiritsUrl='game-v42-miner-ghosts.txt?v=43';
 const tailUrl='game-v8-part3.txt?v=42';
 
 async function read(url){
