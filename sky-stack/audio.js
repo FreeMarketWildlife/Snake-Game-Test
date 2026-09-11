@@ -81,13 +81,15 @@ function toneAt(freq,t,d=.08,v=.08,type='triangle',slide=0,bus=sfx,pan=0){if(!re
 function tone(freq,d=.08,v=.08,type='triangle',slide=0){if(ready)toneAt(freq,ac.currentTime,d,v,type,slide)}
 function noiseAt(t,d=.18,v=.04,cut=1800,pan=0){if(!ready)return;const src=ac.createBufferSource(),f=ac.createBiquadFilter(),g=ac.createGain();src.buffer=makeNoise(Math.max(.25,d));f.type='lowpass';f.frequency.value=cut;env(g,t,.006,Math.max(.0001,v),d);src.connect(f);f.connect(g);route(g,sfx,pan);src.start(t);src.stop(t+d+.02)}
 function noise(d=.18,v=.04,cut=1800){if(ready)noiseAt(ac.currentTime,d,v,cut)}
-function stoneStrike(broken,gain=1,pan=0,midi=broken?50:67){
- const t=ac.currentTime,d=broken?.24:.085;
+function stoneStrike(broken,gain=1,pan=0,midi=67){
+ const t=ac.currentTime,d=.085;
  const buffer=ac.createBuffer(1,Math.ceil(ac.sampleRate*d),ac.sampleRate),samples=buffer.getChannelData(0);
  for(let i=0;i<samples.length;i++)samples[i]=Math.random()*2-1;
- const source=ac.createBufferSource(),filter=ac.createBiquadFilter(),g=ac.createGain();source.buffer=buffer;filter.type='highpass';filter.frequency.value=broken?1100:2400;
- env(g,t,.002,(broken?.12:.06)*gain,d);source.connect(filter);filter.connect(g);route(g,sfx,pan);source.start(t);source.stop(t+d+.02);
- voice(midi,t,broken?.16:.045,.055*gain,'triangle',sfx,pan,0,3000)
+ const source=ac.createBufferSource(),filter=ac.createBiquadFilter(),g=ac.createGain();source.buffer=buffer;filter.type='highpass';filter.frequency.value=2400;
+ env(g,t,.002,.06*gain,d);source.connect(filter);filter.connect(g);route(g,sfx,pan);source.start(t);source.stop(t+d+.02);
+ voice(midi,t,.045,.055*gain,'triangle',sfx,pan,0,3000);
+ // Breaking keeps the same strike, with only a faint breath of debris after it.
+ if(broken){const hiss=ac.createBufferSource(),band=ac.createBiquadFilter(),level=ac.createGain();hiss.buffer=buffer;band.type='bandpass';band.frequency.value=4200;band.Q.value=.7;env(level,t+.025,.008,.006*gain,.075);hiss.connect(band);band.connect(level);route(level,sfx,pan);hiss.start(t+.025);hiss.stop(t+.105)}
 }
 function goldChaching(gain=1,pan=0){
  if(!ready||ac.state!=='running'||document.hidden||gain<.012)return;
