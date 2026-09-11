@@ -1,7 +1,7 @@
 (() => {
 'use strict';
 let ac,music,sfx,ambience,ready=false,timer=null,next=0,bar=0,beatOrigin=0,windSource=null,lastSplash=0,lastSizzle=0;
-let ghostMix=0,ghostPan=0,lastSpiritDeathSlot=-1,spiritCues=0,lastGoldSlot=-1;
+let ghostMix=0,ghostPan=0,lastSpiritDeathSlot=-1,spiritCues=0,lastGoldSlot=-1,musicOn=true,sfxOn=true;
 let automation,machineSource=()=>[],machineSlot=0,machineVoices=[],machineHistory=[],machineMix=[];
 const minerSlots=new Map();
 const pendingMinerVoices=new Map();
@@ -31,7 +31,7 @@ const SONG=[
  {chord:[45,52,57,61],bass:[33,40],melody:[[1,61,1.3],[3,64,.7]]}
 ],ARP=[0,2,1,3,1,2,0,1];
 function env(g,t,a,v,d){g.gain.setValueAtTime(.0001,t);g.gain.linearRampToValueAtTime(v,t+a);g.gain.exponentialRampToValueAtTime(.0001,t+d)}
-function route(node,bus,pan=0){if(ac.createStereoPanner){const p=ac.createStereoPanner();p.pan.value=Math.max(-1,Math.min(1,pan));node.connect(p);p.connect(bus)}else node.connect(bus)}
+function route(node,bus,pan=0){if(bus===music&&!musicOn)return;if(bus===sfx&&!sfxOn)return;if(ac.createStereoPanner){const p=ac.createStereoPanner();p.pan.value=Math.max(-1,Math.min(1,pan));node.connect(p);p.connect(bus)}else node.connect(bus)}
 function voice(midi,t,d,v,type='triangle',bus=music,pan=0,detune=0,cutoff=1800){const o=ac.createOscillator(),f=ac.createBiquadFilter(),g=ac.createGain();o.type=type;o.frequency.value=hz(midi);o.detune.value=detune;f.type='lowpass';f.frequency.value=cutoff;env(g,t,.018,v,d);o.connect(f);f.connect(g);route(g,bus,pan);o.start(t);o.stop(t+d+.06)}
 function pad(midi,t,d,pan){
  const f=ac.createBiquadFilter(),g=ac.createGain(),lfo=ac.createOscillator(),depth=ac.createGain();f.type='lowpass';f.frequency.value=950;g.gain.setValueAtTime(.0001,t);g.gain.linearRampToValueAtTime(.018,t+.65);g.gain.setValueAtTime(.018,t+d-.55);g.gain.exponentialRampToValueAtTime(.0001,t+d+.75);lfo.frequency.value=.18;depth.gain.value=4;lfo.connect(depth);
@@ -145,6 +145,8 @@ function spiritCue(kind,gain=1,pan=0){
  if(kind==='revive')noiseAt(ac.currentTime,.09,.017*gain,1600,pan);
  spiritCues++
 }
+function setMusicEnabled(on){musicOn=!!on;if(music?.gain)music.gain.setTargetAtTime(musicOn?.43:.0001,ac.currentTime,.025);return musicOn}
+function setSfxEnabled(on){sfxOn=!!on;if(sfx?.gain)sfx.gain.setTargetAtTime(sfxOn?.9:.0001,ac.currentTime,.025);return sfxOn}
 function place(material,cost=1){if(!ready)return;voice(material==='deepslate'?36:material==='stone'?43:48,ac.currentTime,.14,.07+Math.min(.03,cost*.002),'triangle',sfx,0,0,700)}
 function unlock(){if(!ready)return;const t=ac.currentTime;[62,66,69,74].forEach((m,i)=>voice(m,t+i*.09,.48,.05,'sine',sfx,(i-1.5)*.12))}
 function ui(){tone(620,.035,.018,'sine')}
@@ -152,7 +154,7 @@ function splash(kind='water'){if(!ready||performance.now()-lastSplash<180)return
 function sizzle(){if(!ready||performance.now()-lastSizzle<120)return;lastSizzle=performance.now();noise(.24,.045,3000);tone(170,.16,.03,'triangle',90)}
 async function ensure(){if(ready){if(ac.state==='suspended')try{await ac.resume()}catch{};return}try{const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;ac=new AC();const master=ac.createGain(),comp=ac.createDynamicsCompressor();music=ac.createGain();sfx=ac.createGain();ambience=ac.createGain();automation=ac.createGain();automation.gain.value=.45;automation.connect(master);master.gain.value=.76;music.gain.value=.43;sfx.gain.value=.9;ambience.gain.value=.11;music.connect(master);sfx.connect(master);ambience.connect(master);master.connect(comp);comp.connect(ac.destination);await ac.resume();ready=true;start();startAmbience();setInterval(scheduleBirds,9000)}catch(e){console.warn('Audio start failed',e)}}
 document.addEventListener('pointerdown',ensure,{capture:true});document.addEventListener('keydown',ensure,{capture:true});document.addEventListener('visibilitychange',()=>{if(document.hidden){clearInterval(timer);timer=null}else if(ready)ac.resume().then(start).catch(()=>{})});
-window.SkyAudio={ensure,hit,minerHit,rhythm,place,unlock,ui,splash,sizzle,spiritCue,setGhostPresence,goldChaching,setMachineSource,bpm:BPM};
+window.SkyAudio={ensure,hit,minerHit,rhythm,place,unlock,ui,splash,sizzle,spiritCue,setGhostPresence,goldChaching,setMachineSource,setMusicEnabled,setSfxEnabled,bpm:BPM};
 window.__skyStackAudioDebug=()=>({ready,bpm:BPM,bar,scoreBars:SONG.length,midiOnly:true,wind:!!windSource,musicGain:music?.gain?.value??null,ambienceGain:ambience?.gain?.value??null,ghostMix,spiritCues,automation:{beatOrigin,beat:rhythm().beatIndex,currentBar:Math.floor(rhythm().beatIndex/4),subdivision:Math.floor(rhythm().phase*4),definitions:MACHINE_AUDIO,mix:machineMix,activeVoices:machineVoices.filter(v=>v.end>(ac?.currentTime||0)).length,events:machineHistory,minerVoices:minerSlots.size}});
 document.documentElement.dataset.audioEngine='midi-ready';
 })();

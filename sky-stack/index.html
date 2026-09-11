@@ -15,6 +15,7 @@
   <link rel="stylesheet" href="style-v32-art.css?v=32">
   <link rel="stylesheet" href="style-v39-pickaxe.css?v=39">
   <link rel="stylesheet" href="style-v41-trees.css?v=41">
+  <link rel="stylesheet" href="style-v45-audio-controls.css?v=45">
   <link rel="stylesheet" href="style-v44-industry.css?v=45">
 </head>
 <body>
@@ -30,6 +31,7 @@
     <div class="cams">
       <button class="btn" id="top">▲ TOP</button>
       <button class="btn" id="down">▼ DOWN</button>
+      <div class="audioToggles" aria-label="Audio controls"><button class="btn audioToggle" id="musicToggle" aria-pressed="true">♫ MUSIC ON</button><button class="btn audioToggle" id="sfxToggle" aria-pressed="true">♪ SFX ON</button></div>
     </div>
   </div>
 
@@ -140,5 +142,8 @@
 <script src="https://cdn.jsdelivr.net/npm/matter-js@0.20.0/build/matter.min.js"></script>
 <script src="audio.js?v=45"></script>
 <script src="game-v28.js?v=45"></script>
+<script>
+for(const [id,label,fn] of [['musicToggle','MUSIC', 'setMusicEnabled'],['sfxToggle','SFX','setSfxEnabled']])document.getElementById(id).addEventListener('click',async()=>{await window.SkyAudio?.ensure();const on=window.SkyAudio?.[fn](!document.getElementById(id).matches('[aria-pressed=true]'));const b=document.getElementById(id);b.setAttribute('aria-pressed',on);b.textContent=(label==='MUSIC'?'♫ ':'♪ ')+label+' '+(on?'ON':'OFF')});
+</script>
 </body>
 </html>
