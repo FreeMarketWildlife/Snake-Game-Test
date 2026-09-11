@@ -11,7 +11,7 @@
 .resourceCard{display:flex;align-items:center;gap:9px;padding:12px 9px;border:1px solid #706078;background:#292938;min-width:0;font-size:11px}
 .resourceCard small{display:block;color:#a59aac;font-size:8px;margin-top:5px}.resourceCard b{margin-left:auto;color:#f2e9d6;font-size:15px;font-variant-numeric:tabular-nums}
 .oreIcon{width:18px;height:18px;flex-shrink:0;background:var(--ore,#82929c);box-shadow:inset 4px 3px #ffffff35,inset -4px -3px #00000055;clip-path:polygon(20% 0,80% 0,100% 30%,100% 80%,70% 100%,10% 85%,0 25%)}
-.ironOre{--ore:#dda783}.copperOre{--ore:#79c3ad}.ironIngot{--ore:#dce6eb}.copperIngot{--ore:#e6ad72}.oreIcon.ingot{clip-path:polygon(20% 15%,80% 15%,100% 75%,85% 90%,0 90%,0 75%)}
+.ironOre{--ore:#dda783}.copperOre{--ore:#b8754f}.ironIngot{--ore:#dce6eb}.copperIngot{--ore:#e6ad72}.oreIcon.ingot{clip-path:polygon(20% 15%,80% 15%,100% 75%,85% 90%,0 90%,0 75%)}
 .furnaceCard{padding:16px;border:2px solid #907c81;background:#38303d}.furnaceCard h3{color:#f0c281!important}.furnaceCard p{font-size:11px;line-height:1.6;color:#cfc1ce}
 #furnaceBuild{width:100%;min-height:44px;font-size:10px}
 #furnaceControls label[for]{display:block;font-size:9px;margin:16px 0 6px;color:#c8b9ca}

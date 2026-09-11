@@ -2,7 +2,7 @@
 const RESOURCE_DEFS_V44={
   coal:{name:'Coal',color:'#82929c',kind:'Raw'},
   ironOre:{name:'Iron ore',color:'#dda783',kind:'Raw'},
-  copperOre:{name:'Copper ore',color:'#79c3ad',kind:'Raw'},
+  copperOre:{name:'Copper ore',color:'#b8754f',kind:'Raw'},
   ironIngot:{name:'Iron ingot',color:'#dce6eb',kind:'Refined'},
   copperIngot:{name:'Copper ingot',color:'#e6ad72',kind:'Refined'}
 };

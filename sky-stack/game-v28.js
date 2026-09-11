@@ -32,7 +32,7 @@ const artDirectionUrl='game-v32-art-direction.txt?v=41';
 const pickaxeUrl='game-v39-pickaxe.txt?v=39';
 const treesUrl='game-v41-trees.txt?v=44';
 const spiritsUrl='game-v42-miner-ghosts.txt?v=43';
-const industryUrl='game-v44-industry-resources.txt?v=44';
+const industryUrl='game-v44-industry-resources.txt?v=45';
 const tailUrl='game-v8-part3.txt?v=42';
 
 async function read(url){
