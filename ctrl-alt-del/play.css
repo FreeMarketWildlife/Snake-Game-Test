@@ -71,7 +71,7 @@ button{font:inherit;color:inherit}
 .rotate-gate{display:none;position:fixed;inset:0;z-index:99;background:#07050d;color:#fff;align-items:center;justify-content:center;flex-direction:column;text-align:center;gap:8px;padding:24px}
 .rotate-gate strong{color:var(--cyan);font-size:20px;letter-spacing:.12em}
 .rotate-gate span{color:var(--muted);font-size:11px}
-.rotate-icon{font-size:46px;color:var(--pink);animation:rotateNudge 1.4s ease-in-out infinite}
+.rotate-icon{padding:7px 10px;border:2px solid var(--pink);color:var(--pink);font-size:11px;font-weight:900;letter-spacing:.16em;animation:rotateNudge 1.4s ease-in-out infinite}
 
 .mode-picker{position:fixed;inset:0;z-index:20;background:rgba(3,2,8,.82);backdrop-filter:blur(5px);display:grid;place-items:center;padding:max(10px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(10px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left))}
 .glitch-card{width:min(1000px,96vw);border:1px solid rgba(57,242,223,.5);background:#090613;box-shadow:8px 8px 0 #000,0 0 40px rgba(142,98,255,.18);padding:clamp(12px,2vw,22px);position:relative;overflow:hidden}
@@ -79,7 +79,7 @@ button{font:inherit;color:inherit}
 .glitch-kicker{font-size:8px;letter-spacing:.18em;color:var(--red);margin-bottom:5px}
 .glitch-card h2{margin:0;color:var(--cyan);font-size:clamp(15px,2.1vw,24px);letter-spacing:.08em;text-shadow:2px 2px 0 #000}
 .glitch-card>p{margin:6px 0 12px;color:var(--muted);font-size:9px}
-.mode-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
+.mode-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 .mode-card{border:1px solid var(--line);background:#100b1d;padding:10px;text-align:left;cursor:pointer;display:grid;grid-template-rows:auto auto auto 1fr;min-height:175px;position:relative;overflow:hidden}
 .mode-card:hover,.mode-card:focus-visible{outline:none;transform:translateY(-3px);border-color:var(--cyan);box-shadow:0 5px 0 rgba(0,0,0,.5)}
 .mode-number{font-size:8px;color:var(--amber);margin-bottom:5px}
@@ -92,9 +92,6 @@ button{font:inherit;color:inherit}
 .scene-fps{background:linear-gradient(135deg,#321d49,#0b0a11 42%,#1c1230 43% 57%,#08070d 58%)}
 .scene-fps::before{content:"";position:absolute;left:50%;bottom:3px;transform:translateX(-50%);border-left:18px solid transparent;border-right:18px solid transparent;border-bottom:50px solid rgba(57,242,223,.16)}
 .scene-fps::after{content:"";position:absolute;left:48%;bottom:25px;width:8px;height:15px;background:#8b1b45;box-shadow:-2px 5px 0 #1a1018,10px 0 0 -2px var(--pink)}
-.scene-fighter{background:linear-gradient(#481c4b 0 55%,#24152d 55% 67%,#09080f 67%)}
-.scene-fighter::before{content:"";position:absolute;left:26%;bottom:13px;width:6px;height:24px;background:var(--cyan);box-shadow:100px 0 0 var(--pink)}
-.scene-fighter::after{content:"";position:absolute;left:31%;bottom:28px;width:60px;height:2px;background:var(--amber);box-shadow:22px 5px 0 0 var(--pink)}
 .text-button{margin-top:10px;border:0;background:transparent;color:var(--muted);font-size:8px;cursor:pointer;padding:5px 0}
 .text-button:hover{color:var(--cyan)}
 
@@ -103,18 +100,26 @@ button{font:inherit;color:inherit}
 #gameCanvas{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated;image-rendering:crisp-edges;background:#090712}
 .game-topbar{position:absolute;z-index:5;top:0;left:0;right:0;height:22px;display:flex;align-items:center;justify-content:space-between;padding:0 6px;background:linear-gradient(rgba(4,3,9,.9),rgba(4,3,9,.45));font-size:7px;letter-spacing:.08em;text-shadow:1px 1px 0 #000;pointer-events:none}
 .game-topbar>div:first-child{display:flex;align-items:center;gap:7px}
-.exit-button{pointer-events:auto;width:18px;height:18px;border:1px solid rgba(255,255,255,.2);background:#170d20;color:#fff;display:grid;place-items:center;line-height:1;cursor:pointer;padding:0;font-size:14px}
+.exit-button{pointer-events:auto;min-width:34px;height:18px;border:1px solid rgba(255,255,255,.2);background:#170d20;color:#fff;display:grid;place-items:center;line-height:1;cursor:pointer;padding:0 4px;font-size:7px;font-weight:900}
 .exit-button:active{background:var(--red)}
 #gameTitle{color:var(--cyan);font-weight:900}
 #gameMeta{color:var(--muted)}
-.touch-controls{position:absolute;z-index:6;inset:0;pointer-events:none}
-.control-cluster{position:absolute;bottom:8px;display:flex;gap:6px;pointer-events:auto}
-.control-cluster.left{left:8px}
-.control-cluster.right{right:8px}
-.touch-btn{width:44px;height:44px;border:1px solid rgba(255,255,255,.24);background:rgba(8,7,18,.58);color:#fff;display:grid;place-items:center;font-size:12px;font-weight:900;user-select:none;touch-action:none;box-shadow:inset 0 0 0 2px rgba(0,0,0,.25)}
-.touch-btn.action{border-color:rgba(255,57,203,.5);color:#ffd3f4}
-.touch-btn.alt{border-color:rgba(57,242,223,.5);color:#cffff8}
-.touch-btn:active,.touch-btn.pressed{background:rgba(57,242,223,.28);transform:translateY(1px)}
+.touch-controls{position:absolute;z-index:6;inset:0;pointer-events:none;--control-size:clamp(48px,13.5vh,64px)}
+.look-zone{position:absolute;z-index:1;top:22px;right:0;bottom:0;width:68%;pointer-events:auto;touch-action:none;cursor:grab}
+.look-zone.active{cursor:grabbing}
+.look-hint{position:absolute;right:22%;top:38%;padding:4px 7px;border:1px solid rgba(57,242,223,.22);background:rgba(5,4,12,.34);color:rgba(207,255,248,.58);font-size:7px;letter-spacing:.12em;pointer-events:none}
+.virtual-stick{position:absolute;z-index:3;left:max(12px,env(safe-area-inset-left));bottom:max(12px,env(safe-area-inset-bottom));width:calc(var(--control-size) * 1.45);height:calc(var(--control-size) * 1.45);border:2px solid rgba(57,242,223,.5);background:rgba(7,10,18,.58);box-shadow:inset 0 0 0 5px rgba(0,0,0,.2),0 0 16px rgba(57,242,223,.09);pointer-events:auto;touch-action:none;user-select:none}
+.stick-cross::before,.stick-cross::after{content:"";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:rgba(57,242,223,.18);pointer-events:none}
+.stick-cross::before{width:70%;height:1px}.stick-cross::after{width:1px;height:70%}
+.stick-knob{position:absolute;left:50%;top:50%;width:calc(var(--control-size) * .58);height:calc(var(--control-size) * .58);transform:translate(-50%,-50%);border:2px solid var(--cyan);background:rgba(20,57,60,.88);box-shadow:inset 0 0 0 3px rgba(0,0,0,.24)}
+.stick-caption{position:absolute;left:50%;top:-11px;transform:translateX(-50%);font-size:7px;color:#cffff8;letter-spacing:.14em;text-shadow:1px 1px #000}
+.action-cluster{position:absolute;z-index:4;right:max(12px,env(safe-area-inset-right));bottom:max(10px,env(safe-area-inset-bottom));display:grid;grid-template-columns:calc(var(--control-size) * .88) var(--control-size);grid-template-rows:repeat(2,calc(var(--control-size) * .78));gap:6px;pointer-events:none}
+.touch-btn{border:2px solid rgba(255,255,255,.3);background:rgba(8,7,18,.76);color:#fff;display:grid;place-items:center;font-size:clamp(8px,2.2vh,11px);font-weight:900;letter-spacing:.04em;user-select:none;touch-action:none;pointer-events:auto;box-shadow:inset 0 0 0 3px rgba(0,0,0,.24),3px 3px 0 rgba(0,0,0,.32)}
+.touch-btn.fire{grid-column:2;grid-row:1 / span 2;border-color:rgba(255,57,203,.82);background:rgba(87,11,69,.76);color:#fff0fb}
+.touch-btn.punch{grid-column:1;grid-row:2;border-color:rgba(255,184,74,.72);color:#fff0cf}
+.touch-btn.jump{grid-column:1;grid-row:1;border-color:rgba(57,242,223,.72);color:#cffff8}
+.touch-btn:active,.touch-btn.pressed{background:rgba(57,242,223,.38);transform:translate(1px,1px);box-shadow:inset 0 0 0 3px rgba(0,0,0,.2)}
+.desktop-hint{position:absolute;z-index:2;left:50%;bottom:7px;transform:translateX(-50%);padding:3px 6px;background:rgba(4,3,9,.52);color:rgba(255,255,255,.52);font-size:7px;letter-spacing:.08em;white-space:nowrap}
 .game-message{position:absolute;z-index:10;left:50%;top:50%;transform:translate(-50%,-50%);min-width:220px;max-width:75%;padding:14px;border:1px solid var(--cyan);background:rgba(6,5,15,.95);text-align:center;font-size:9px;line-height:1.5;box-shadow:7px 7px 0 #000}
 .game-message strong{display:block;color:var(--cyan);font-size:14px;margin-bottom:5px}
 .game-message button{margin-top:8px;border:1px solid var(--pink);background:var(--pink);color:#170313;padding:7px 11px;font-weight:900;cursor:pointer}
@@ -149,5 +154,9 @@ button{font:inherit;color:inherit}
   .episode-btn strong{font-size:11px}
   .episode-btn small{font-size:7px}
   .mode-grid{gap:5px}
-  .touch-btn{width:38px;height:38px;font-size:10px}
+  .touch-controls{--control-size:clamp(46px,14vh,58px)}
+}
+
+@media (hover:hover) and (pointer:fine){
+  .virtual-stick,.action-cluster{opacity:.52}
 }
