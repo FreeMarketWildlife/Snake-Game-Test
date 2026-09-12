@@ -6,12 +6,12 @@
   <meta name="theme-color" content="#080610" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <title>CTRL ALT DEL — Prototype Lab</title>
+  <title>CTRL ALT DEL — Chapter One</title>
   <link rel="stylesheet" href="play.css" />
 </head>
 <body>
   <div id="rotateGate" class="rotate-gate" aria-hidden="true">
-    <div class="rotate-icon">↻</div>
+    <div class="rotate-icon">LANDSCAPE</div>
     <strong>ROTATE DEVICE</strong>
     <span>CTRL ALT DEL is built for horizontal play.</span>
   </div>
@@ -36,7 +36,7 @@
     </section>
 
     <footer class="hud-bottom">
-      <span>BUILD 0.2 // PROTOTYPE LAB</span>
+      <span>BUILD 0.3 // RUN-AND-GUN</span>
       <span id="statusText">UNAUTHORIZED BROADCAST DETECTED</span>
       <span>TOUCH + KEYBOARD</span>
     </footer>
@@ -45,26 +45,20 @@
   <section id="modePicker" class="mode-picker hidden" aria-label="Chapter one prototype selector">
     <div class="glitch-card">
       <div class="glitch-kicker">ROUTING ERROR // CHAPTER ONE</div>
-      <h2>THREE VERSIONS OF REALITY DETECTED</h2>
-      <p>The archive cannot decide what kind of game this is. Pick a simulation.</p>
+      <h2>TWO COMBAT ROUTES DETECTED</h2>
+      <p>Play the main run-and-gun campaign style, or enter a NEXUS first-person simulation.</p>
       <div class="mode-grid">
         <button class="mode-card platformer" data-mode="platformer">
           <span class="mode-number">01</span>
-          <strong>SIDE-SCROLLER</strong>
-          <small>2D platformer shooter // rush the robots</small>
+          <strong>RUN-AND-GUN</strong>
+          <small>main campaign style // move, jump, shoot and punch</small>
           <span class="mini-scene scene-platformer" aria-hidden="true"></span>
         </button>
         <button class="mode-card fps" data-mode="fps">
           <span class="mode-number">02</span>
-          <strong>NEXUS-DOOM</strong>
-          <small>old-school first-person shooter // cyborg corridors</small>
+          <strong>NEXUS FPS</strong>
+          <small>Doom-style mission // move, look, shoot and punch</small>
           <span class="mini-scene scene-fps" aria-hidden="true"></span>
-        </button>
-        <button class="mode-card fighter" data-mode="fighter">
-          <span class="mode-number">03</span>
-          <strong>BLASTER DUEL</strong>
-          <small>arcade fighting game // steel, fists and lasers</small>
-          <span class="mini-scene scene-fighter" aria-hidden="true"></span>
         </button>
       </div>
       <button id="pickerBack" class="text-button">&lt; RETURN TO CHAPTER ARCHIVE</button>
@@ -75,7 +69,7 @@
     <div class="game-frame">
       <div class="game-topbar">
         <div>
-          <button id="exitGame" class="exit-button">×</button>
+          <button id="exitGame" class="exit-button" aria-label="Exit game">EXIT</button>
           <span id="gameTitle">SIMULATION</span>
         </div>
         <div id="gameMeta">CHAPTER ONE // INTRO</div>
