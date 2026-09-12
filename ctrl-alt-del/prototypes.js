@@ -33,6 +33,29 @@
     if (k) { input.delete(k); e.preventDefault(); }
   }, { passive:false });
 
+  function isGameGesture(event) {
+    const target=event.target;
+    return running && (target === shell || (target instanceof Node && shell.contains(target)));
+  }
+
+  function releaseInputs() {
+    input.clear();touch.x=0;touch.y=0;touch.look=0;
+    controls.querySelectorAll(".pressed").forEach(node=>node.classList.remove("pressed"));
+    const knob=controls.querySelector(".stick-knob");
+    if(knob)knob.style.transform="translate(-50%,-50%)";
+  }
+
+  ["selectstart","contextmenu","dragstart","gesturestart","gesturechange","gestureend"].forEach(type=>{
+    window.addEventListener(type,event=>{if(isGameGesture(event))event.preventDefault();},{passive:false,capture:true});
+  });
+  window.addEventListener("touchmove",event=>{if(isGameGesture(event))event.preventDefault();},{passive:false,capture:true});
+  window.addEventListener("pointercancel",releaseInputs,{capture:true});
+  window.addEventListener("touchcancel",releaseInputs,{capture:true});
+  window.addEventListener("blur",releaseInputs);
+  window.addEventListener("pagehide",releaseInputs);
+  window.addEventListener("orientationchange",releaseInputs);
+  document.addEventListener("visibilitychange",()=>{if(document.hidden)releaseInputs();});
+
   function audio(freq=440, duration=.05, type="square", volume=.035) {
     try {
       const AudioCtx = window.AudioContext || window.webkitAudioContext;
@@ -54,9 +77,9 @@
         <span class="stick-caption">MOVE</span><span class="stick-cross"></span><span class="stick-knob"></span>
       </div>
       <div class="action-cluster">
-        ${jump ? '<button class="touch-btn jump" data-key="up">JUMP</button>' : '<span></span>'}
-        <button class="touch-btn punch" data-key="punch">PUNCH</button>
-        <button class="touch-btn fire" data-key="fire">FIRE</button>
+        ${jump ? '<button type="button" class="touch-btn jump" data-key="up">JUMP</button>' : '<span></span>'}
+        <button type="button" class="touch-btn punch" data-key="punch">PUNCH</button>
+        <button type="button" class="touch-btn fire" data-key="fire">FIRE</button>
       </div>
       <div class="desktop-hint">${look ? 'WASD MOVE // DRAG OR ARROWS LOOK // SPACE FIRE // E PUNCH' : 'A/D MOVE // W JUMP // SPACE FIRE // E PUNCH'}</div>`;
 
@@ -79,7 +102,7 @@
 
     controls.querySelectorAll("[data-key]").forEach(b=>{
       const key=b.dataset.key;
-      const on=e=>{e.preventDefault();b.setPointerCapture?.(e.pointerId);input.add(key);b.classList.add("pressed");};
+      const on=e=>{e.preventDefault();try{b.setPointerCapture?.(e.pointerId);}catch(_){}input.add(key);b.classList.add("pressed");};
       const off=e=>{e.preventDefault();input.delete(key);b.classList.remove("pressed");};
       b.addEventListener("pointerdown",on);b.addEventListener("pointerup",off);b.addEventListener("pointercancel",off);b.addEventListener("lostpointercapture",off);
     });
@@ -102,7 +125,7 @@
   function hideMessage(){ gameMessage.classList.add("hidden"); gameMessage.innerHTML=""; }
 
   function launch(mode) {
-    stop(); input.clear(); hideMessage(); shell.classList.remove("hidden"); running=true; last=performance.now();
+    stop();releaseInputs();hideMessage();document.getSelection?.()?.removeAllRanges();shell.classList.remove("hidden");shell.classList.add("game-input-active");running=true;last=performance.now();
     if(mode==="platformer") active=createPlatformer();
     if(mode==="fps") active=createFPS();
     if(!active){running=false;shell.classList.add("hidden");return;}
@@ -111,7 +134,7 @@
   }
 
   function stop() {
-    running=false; cancelAnimationFrame(raf); input.clear(); touch.x=0;touch.y=0;touch.look=0;active?.stop?.(); active=null; controls.innerHTML="";
+    running=false;cancelAnimationFrame(raf);releaseInputs();active?.stop?.();active=null;controls.innerHTML="";shell.classList.remove("game-input-active");
   }
 
   exitButton.addEventListener("click",()=>{ audio(220,.06); stop(); shell.classList.add("hidden"); hideMessage(); });
