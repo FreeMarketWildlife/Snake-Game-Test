@@ -73,10 +73,12 @@ async function read(url){
     const pickaxes=await read('game-v49-pickaxes.txt?v=49');
     const workshopUi=await read('game-v50-workshop-ui.txt?v=50');
     const keyboard=await read('game-v52-keyboard.txt?v=52');
+    const devResources=await read('game-v54-dev-resources.txt?v=54');
     const marker='restoreDynamicState(initialSave);';
     if(!tail.includes(marker))throw new Error('v28 insertion marker missing');
     tail=tail.replace(marker,camera+'\n'+grid+'\n'+zoom+'\n'+miner+'\n'+resources+'\n'+liquidFeel+'\n'+devPanel+'\n'+obsidianArt+'\n'+artDirection+'\n'+pickaxe+'\n'+trees+'\n'+spirits+'\n'+industry+'\n'+structureArt+'\n'+structures+'\n'+structuresUi+'\n'+pickaxes+'\n'+workshopUi+'\n'+keyboard+'\n'+marker);
 
+    tail=tail.replace(marker,devResources+'\n'+marker);
     const src=core+'\n});\n'+liquid+'\n'+tail;
     (0,eval)(src);
   }catch(e){

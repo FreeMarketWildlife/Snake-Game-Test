@@ -51,6 +51,7 @@ function saveGame(){
     const placed=[];for(const z of bs)if(z.game?.placed)placed.push({nailed:!!z.game.nailed,material:z.game.material,x:z.position.x,y:z.position.y,w:z.game.w,h:z.game.h,cost:z.game.cost,hits:z.game.hits||0,angle:z.angle,vx:z.velocity.x,vy:z.velocity.y,av:z.angularVelocity});
     const workerData=[];for(const q of miners)workerData.push({id:q.game.id,level:q.game.level,gold:q.game.gold,dir:q.game.dir,x:q.position.x,y:q.position.y,angle:q.angle,vx:q.velocity.x,vy:q.velocity.y,av:q.angularVelocity});
     const s={v:1,savedAt:Date.now(),pickaxeTier,pickaxeOwnedTier:typeof pickaxeOwnedTier==='number'?pickaxeOwnedTier:pickaxeTier,best,deepslateUnlocked:deepslate,inv:{...inv},deadMiners,restingMiners,removed:[...removedTerrain],damage:[...terrainDamage.entries()],placed,miners:workerData,cam:{x:cam.x,y:cam.y}};
+    if(typeof saveInventoryV54==='function')s.inv=saveInventoryV54();
     if(typeof saveTreesV41==='function')s.treesV41=saveTreesV41();
     if(typeof saveMinerLifeV42==='function')s.minerLifeV42=saveMinerLifeV42();
     if(typeof saveIndustryV44==='function')s.industryV44=saveIndustryV44();

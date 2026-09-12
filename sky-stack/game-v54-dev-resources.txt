@@ -1,0 +1,27 @@
+// Finite virtual balances keep existing cost arithmetic safe. Real balances are
+// saved separately so the session-only cheat never replaces inventory with null
+// (JSON Infinity) or a billion resources.
+const devResourceBalanceV54={},DEV_SUPPLY_V54=1000000000;
+devToolsV30.infiniteResources=false;
+for(const key of Object.keys(inv)){
+ devResourceBalanceV54[key]=inv[key];
+ Object.defineProperty(inv,key,{enumerable:true,configurable:true,
+  get(){return devToolsV30.infiniteResources?DEV_SUPPLY_V54:devResourceBalanceV54[key]},
+  set(value){
+   if(!Number.isFinite(value))return;
+   if(!devToolsV30.infiniteResources)devResourceBalanceV54[key]=Math.max(0,value);
+   else if(value>DEV_SUPPLY_V54)devResourceBalanceV54[key]+=value-DEV_SUPPLY_V54;
+  }
+ });
+}
+function saveInventoryV54(){return {...devResourceBalanceV54}}
+$('devInfinite').closest('label').insertAdjacentHTML('afterend','<label class="devCheck"><input id="devResources" type="checkbox"><span>Infinite resources<small>Unlimited materials, ore, metals, nails and currency. Unlock rules still apply. Resets on reload.</small></span></label>');
+$('devResources').onchange=e=>{devToolsV30.infiniteResources=e.target.checked;ui();refreshMinerMenu();$('devFeedback').textContent=devToolsV30.infiniteResources?'Infinite resources enabled. Building and crafting do not spend your inventory.':'Normal resources restored.'};
+function resourceNumbersV54(){
+ if(!devToolsV30.infiniteResources)return;
+ for(const id of ['dc','woodCount','leavesCount','sc','dsc','oc','gc','diamondCount',...Object.keys(RESOURCE_DEFS_V44).map(k=>'resource-'+k)])if($(id))$(id).textContent='∞';
+ for(const id of ['devSummary','nailToggle','pickaxeFunds'])if($(id))$(id).textContent=$(id).textContent.replace(/1000000000/g,'∞');
+}
+const resourceUiBeforeV54=ui;ui=function(){resourceUiBeforeV54();resourceNumbersV54()};
+const resourceRefreshBeforeV54=refreshStructuresV46;refreshStructuresV46=function(){resourceRefreshBeforeV54();resourceNumbersV54()};
+const resourceCostBeforeV54=costTextV46;costTextV46=cost=>devToolsV30.infiniteResources?Object.entries(cost).map(([k,n])=>n+' '+labelV46(k)+' (∞)').join(' + '):resourceCostBeforeV54(cost);

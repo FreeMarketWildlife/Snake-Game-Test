@@ -141,8 +141,8 @@
   <div id="toast" class="hide"></div><div id="load">Loading physics…</div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/matter-js@0.20.0/build/matter.min.js"></script>
-<script src="audio.js?v=49"></script>
-<script src="game-v28.js?v=52"></script>
+<script src="audio.js?v=53"></script>
+<script src="game-v28.js?v=54"></script>
 <script>
 for(const [id,label,fn] of [['musicToggle','MUSIC', 'setMusicEnabled'],['sfxToggle','SFX','setSfxEnabled']])document.getElementById(id).addEventListener('click',async()=>{await window.SkyAudio?.ensure();const on=window.SkyAudio?.[fn](!document.getElementById(id).matches('[aria-pressed=true]'));const b=document.getElementById(id);b.setAttribute('aria-pressed',on);b.textContent=(label==='MUSIC'?'♫ ':'♪ ')+label+' '+(on?'ON':'OFF')});
 </script>

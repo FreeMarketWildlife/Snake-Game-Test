@@ -157,3 +157,12 @@ clears held keys, and shortcuts do not intercept form input or modal dialogs.
 Run `node sky-stack/tests/keyboard-browser.test.cjs` with Playwright available.
 The browser check exercises all mappings, pick selection, held-key motion, both
 Shift keys, release during dragging, focus loss, and typing in the developer form.
+
+## Infinite resources — v54
+
+Dev Tools → Infinite resources supplies materials, industrial ingredients, nails,
+and currency without spending real inventory. Counts display ∞. Unlock rules
+still apply; structures must still be crafted and placed normally. The toggle is
+session-only. Saves retain real balances and earned/crafted items, and disabling
+the toggle restores normal spending. `dev-resources-browser.test.cjs` checks
+construction, crafting, currency, inventory restoration, and reload behavior.
