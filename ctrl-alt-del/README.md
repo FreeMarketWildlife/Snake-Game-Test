@@ -41,6 +41,7 @@ Implemented UI:
 - Locked Episode III teaser
 - Chapter One **run-and-gun shooter/platformer** with mobile movement, jumping, a laser blaster, punching, enemy waves and health
 - Chapter One **Doom-style first-person shooter** with mobile joystick movement, drag-to-look, shooting, punching, robot AI and a minimap
+- Mobile browser input lock that blocks text selection, long-press callouts, dragging, zoom gestures and overscroll during gameplay, with safe-area control spacing and automatic release of interrupted touches
 
 The run-and-gun is the core campaign direction. The first-person mode is a secondary gameplay style that can appear when the story calls for it. The earlier one-on-one fighting-game experiment has been removed.
 
