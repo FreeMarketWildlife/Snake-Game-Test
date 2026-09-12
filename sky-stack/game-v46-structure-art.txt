@@ -1,0 +1,61 @@
+// Pixel-native architecture. One art pixel is one world pixel; doors fit 26px miners.
+const structureSpritesV46=new Map();
+function structureSpriteV46(type){
+ if(structureSpritesV46.has(type))return structureSpritesV46.get(type);
+ const d=STRUCTURES_V46[type],canvas=document.createElement('canvas');canvas.width=d.w*B;canvas.height=d.h*B;
+ const g=canvas.getContext('2d'),w=canvas.width,h=canvas.height;
+ const r=(x,y,a,b,c)=>{g.fillStyle=c;g.fillRect(x,y,a,b)};
+ const ink='#272535',stone='#666a78',light='#a1a2a7',wood='#80543e',gold='#d7a45a';
+ // Stone footings, mortar and individual dressed blocks.
+ r(2,h-12,w-4,12,ink);r(4,h-11,w-8,8,stone);
+ for(let x=5;x<w-5;x+=16){r(x,h-10,13,2,light);r(x+13,h-8,2,6,'#434451')}
+ if(type==='forge'){
+  r(17,26,w-34,h-38,ink);r(20,29,w-40,h-42,stone);
+  for(let y=30;y<h-16;y+=10)for(let x=20+(y%20?0:8);x<w-21;x+=16){r(x,y,13,7,y%20?'#777985':'#60616f');r(x,y,12,1,light)}
+  r(55,4,21,35,ink);r(58,6,15,31,'#666774');r(55,3,23,5,light);
+  for(let y=13;y<31;y+=9)r(59,y,13,2,'#434451');
+  r(26,h-44,43,30,ink);r(30,h-49,35,8,ink);r(33,h-43,29,28,'#472d32');
+  r(28,h-17,39,4,'#a87554');r(25,h-14,46,3,light);
+  r(7,h-36,15,19,wood);r(8,h-35,12,3,gold);r(10,h-31,3,13,'#b07849');r(17,h-31,2,13,'#513b34');
+  r(72,h-29,20,6,ink);r(73,h-28,18,3,light);r(78,h-23,7,9,wood);
+ }else{
+  const workshop=type==='workshop',roof=workshop?'#638a79':'#8b5964',roofLight=workshop?'#97b39a':'#c1877d';
+  r(8,47,w-16,h-59,ink);r(11,49,w-22,h-62,workshop?'#c7aa7c':'#ac947e');
+  for(let y=54;y<h-14;y+=9){r(12,y,w-24,1,workshop?'#ab8a65':'#897866');for(let x=17+(y%18?0:11);x<w-14;x+=24)r(x,y+1,1,7,'#b39a79')}
+  // Stepped gable roof with shingle courses, ridge cap, and copper edges.
+  for(let y=15;y<49;y+=5){const inset=Math.max(0,Math.floor((48-y)*.73));r(2+inset,y,w-4-inset*2,6,ink);r(5+inset,y,w-10-inset*2,3,roof);r(5+inset,y,w-10-inset*2,1,roofLight);for(let x=10+inset;x<w-inset-8;x+=13)r(x,y+1,1,2,'#3d4d50')}
+  r(28,12,w-56,4,ink);r(31,12,w-62,2,roofLight);r(1,48,w-2,5,ink);r(4,48,w-8,2,gold);
+  for(const x of [10,w-15]){r(x,52,5,h-65,ink);r(x+1,53,2,h-67,wood)}
+  // Doorway is 28 pixels high, with a recessed threshold.
+  const door=workshop?23:w-38;r(door-3,h-44,24,32,wood);r(door,h-42,18,29,ink);r(door+2,h-40,14,26,'#513d38');
+  for(let x=door+3;x<door+16;x+=4)r(x,h-39,1,23,'#866046');r(door+13,h-28,2,3,gold);r(door-2,h-14,24,2,light);
+  // Lit window and timber mullions.
+  const wx=workshop?w-37:18;r(wx-3,59,26,23,wood);r(wx,61,20,17,ink);r(wx+2,63,16,13,'#edc17c');r(wx+3,64,6,5,'#ffe3a4');r(wx+9,62,2,16,wood);r(wx,69,20,2,wood);r(wx-4,80,28,3,gold);
+  if(workshop){
+   // Open working bay, saw bench, lumber and hanging tools.
+   r(52,h-47,34,32,ink);r(54,h-45,30,28,'#564039');r(51,h-28,37,5,gold);r(54,h-23,4,11,wood);r(81,h-23,4,11,wood);
+   r(59,h-38,2,10,'#a2a7a9');r(57,h-40,10,3,'#c8cbd0');r(74,h-40,3,12,wood);r(70,h-41,11,4,'#989daa');
+   r(91,h-20,26,5,wood);r(94,h-25,21,5,gold);r(98,h-30,16,5,wood);
+   r(46,54,39,14,ink);r(48,56,35,10,wood);r(53,60,23,2,gold);r(62,57,3,8,'#e5c591');
+  }else{
+   // Open smithing bay with brick hearth, bellows and a broad steel anvil.
+   r(51,56,65,h-69,ink);r(54,58,59,h-73,'#4b343a');
+   r(54,58,27,30,'#78524c');for(let y=60;y<85;y+=7){r(55,y,24,1,'#b98668');r(64+(y%2)*6,y,2,6,'#4b343a')}
+   r(60,68,16,20,'#272535');r(58,88,23,3,'#a1a2a7');
+   r(87,h-29,9,17,wood);r(79,h-38,30,5,light);r(84,h-33,19,5,stone);r(88,h-28,11,3,light);r(106,h-37,7,2,light);
+   r(44,3,19,34,ink);r(47,6,13,27,stone);r(43,2,21,5,light);r(48,16,11,2,'#434451');r(48,26,11,2,'#434451');
+   r(66,49,34,12,wood);r(70,53,25,3,light);r(77,56,10,2,stone);
+  }
+ }
+ structureSpritesV46.set(type,canvas);return canvas;
+}
+function paintStructureV46(g,b,now=0,active=false){
+ const sprite=structureSpriteV46(b.type);g.drawImage(sprite,0,0);
+ if(b.type==='workshop'&&active){const lift=Math.floor(now/180)%2?5:0;g.fillStyle='#a5afb9';g.fillRect(69,sprite.height-38-lift,10,3);g.fillStyle='#c28e59';g.fillRect(72,sprite.height-35-lift,3,8);g.fillStyle='#efc489';g.fillRect(62,sprite.height-30,5,2)}
+ if(b.type!=='workshop'){
+  const forge=b.type==='forge',x=forge?35:62,y=forge?sprite.height-20:85;
+  if(active){for(let i=0;i<4;i++){const height=6+((Math.floor(now/130)+i*3)%5)*2;g.fillStyle=i%2?'#ffc466':'#ec7844';g.fillRect(x+i*5,y-height,4,height);g.fillStyle='#ffe6a2';g.fillRect(x+i*5,y-4,3,4)}
+   for(let i=0;i<3;i++){const t=(now/60+i*11)%35;g.globalAlpha=(1-t/40)*.4;g.fillStyle='#d7c5bb';g.fillRect((forge?62:50)+Math.floor(Math.sin(t/9)*4),5-t,6+i*2,5+i*2)}g.globalAlpha=1;
+  }else{g.fillStyle='#9f5140';g.fillRect(x,y-2,forge?23:12,2)}
+ }
+}

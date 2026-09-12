@@ -97,7 +97,16 @@ function goldChaching(gain=1,pan=0){
  const t=beatOrigin+slot*step,chord=SONG[Math.floor(slot/16)%SONG.length].chord;
  [chord[0]+36,chord[2]+24,chord[1]+24].forEach((n,i)=>voice(n,t+i*step,.24,.04*gain,'triangle',sfx,pan,0,6500))
 }
-function hit(material,broken=false){if(!ready)return;if(material==='stone')return stoneStrike(broken);const midi={dirt:43,deepslate:40,obsidian:35}[material]||43;voice(midi,ac.currentTime,broken?.2:.09,broken?.1:.065,'triangle',sfx,0,0,material==='dirt'?700:1200);if(broken)noise(.12,.025,material==='dirt'?650:1800)}
+let pickStroke=null;
+function beginPickStroke(){pickStroke=new Map()}
+function endPickStroke(){const hits=pickStroke;pickStroke=null;if(hits)for(const [material,broken] of hits)hit(material,broken)}
+function dirtHat(gain=1,pan=0){
+ if(!ready||ac.state!=='running')return;
+ const t=ac.currentTime,source=ac.createBufferSource(),high=ac.createBiquadFilter(),low=ac.createBiquadFilter(),level=ac.createGain();
+ source.buffer=makeNoise(.08);high.type='highpass';high.frequency.value=6500;low.type='lowpass';low.frequency.value=12500;
+ env(level,t,.001,.065*Math.min(1,gain),.045);source.connect(high);high.connect(low);low.connect(level);route(level,sfx,pan);source.start(t);source.stop(t+.065);
+}
+function hit(material,broken=false){if(pickStroke){pickStroke.set(material,broken||pickStroke.get(material)||false);return}if(!ready)return;if(material==='dirt')return dirtHat();if(material==='stone')return stoneStrike(broken);const midi={dirt:43,deepslate:40,obsidian:35}[material]||43;voice(midi,ac.currentTime,broken?.2:.09,broken?.1:.065,'triangle',sfx,0,0,material==='dirt'?700:1200);if(broken)noise(.12,.025,material==='dirt'?650:1800)}
 function rhythm(){if(!ready||ac.state!=='running')return{ready:false,bpm:BPM,beatMs:beat*1000,beatIndex:-1,barBeat:0,phase:0};const pos=(ac.currentTime-beatOrigin)/beat,index=Math.floor(pos);return{ready:true,bpm:BPM,beatMs:beat*1000,beatIndex:index,barBeat:((index%4)+4)%4,phase:pos-index}}
 function minerHit(material,gain=1,pan=0,broken=false){
  if(!ready||ac.state!=='running'||document.hidden||gain<.012)return;
@@ -115,6 +124,7 @@ function minerHit(material,gain=1,pan=0,broken=false){
  queueMicrotask(()=>{
    pendingMinerVoices.delete(key);if(ac.state!=='running'||document.hidden)return;
    const {gain,pan,broken}=event;
+   if(material==='dirt')return dirtHat(gain,pan);
    if(material==='stone')return stoneStrike(broken,gain,pan,midi);
    voice(midi,ac.currentTime,.12,.055*Math.min(1,gain),'triangle',sfx,pan,0,900);if(broken)noiseAt(ac.currentTime,.1,.02*gain,1300,pan);
  });
@@ -154,7 +164,7 @@ function splash(kind='water'){if(!ready||performance.now()-lastSplash<180)return
 function sizzle(){if(!ready||performance.now()-lastSizzle<120)return;lastSizzle=performance.now();noise(.24,.045,3000);tone(170,.16,.03,'triangle',90)}
 async function ensure(){if(ready){if(ac.state==='suspended')try{await ac.resume()}catch{};return}try{const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;ac=new AC();const master=ac.createGain(),comp=ac.createDynamicsCompressor();music=ac.createGain();sfx=ac.createGain();ambience=ac.createGain();automation=ac.createGain();automation.gain.value=.45;automation.connect(master);master.gain.value=.76;music.gain.value=.43;sfx.gain.value=.9;ambience.gain.value=.11;music.connect(master);sfx.connect(master);ambience.connect(master);master.connect(comp);comp.connect(ac.destination);await ac.resume();ready=true;start();startAmbience();setInterval(scheduleBirds,9000)}catch(e){console.warn('Audio start failed',e)}}
 document.addEventListener('pointerdown',ensure,{capture:true});document.addEventListener('keydown',ensure,{capture:true});document.addEventListener('visibilitychange',()=>{if(document.hidden){clearInterval(timer);timer=null}else if(ready)ac.resume().then(start).catch(()=>{})});
-window.SkyAudio={ensure,hit,minerHit,rhythm,place,unlock,ui,splash,sizzle,spiritCue,setGhostPresence,goldChaching,setMachineSource,setMusicEnabled,setSfxEnabled,bpm:BPM};
+window.SkyAudio={ensure,beginPickStroke,endPickStroke,hit,minerHit,rhythm,place,unlock,ui,splash,sizzle,spiritCue,setGhostPresence,goldChaching,setMachineSource,setMusicEnabled,setSfxEnabled,bpm:BPM};
 window.__skyStackAudioDebug=()=>({ready,bpm:BPM,bar,scoreBars:SONG.length,midiOnly:true,wind:!!windSource,musicGain:music?.gain?.value??null,ambienceGain:ambience?.gain?.value??null,ghostMix,spiritCues,automation:{beatOrigin,beat:rhythm().beatIndex,currentBar:Math.floor(rhythm().beatIndex/4),subdivision:Math.floor(rhythm().phase*4),definitions:MACHINE_AUDIO,mix:machineMix,activeVoices:machineVoices.filter(v=>v.end>(ac?.currentTime||0)).length,events:machineHistory,minerVoices:minerSlots.size}});
 document.documentElement.dataset.audioEngine='midi-ready';
 })();

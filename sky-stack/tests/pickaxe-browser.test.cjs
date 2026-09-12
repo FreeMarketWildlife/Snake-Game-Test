@@ -3,59 +3,42 @@ const {chromium}=require('playwright'),assert=require('node:assert/strict');
  const browser=await chromium.launch({headless:true,...(process.env.SKY_TEST_BROWSER?{executablePath:process.env.SKY_TEST_BROWSER}:{})});
  try{
  const page=await browser.newPage({viewport:{width:1000,height:760}}),errors=[];page.on('pageerror',e=>errors.push(e.message));
- await page.addInitScript(()=>{window.requestAnimationFrame=()=>0});
- await page.route('**/game-v8-part3.txt*',async route=>{
-  const response=await route.fetch(),source=await response.text();
-  const hook=`window.pickTest={
-   get tier(){return pickaxeTier},get gold(){return inv.gold},get counts(){return {...inv}},get camera(){return {...cam}},
-   goldTo(n){inv.gold=n;ui()},screen:w2s,save:saveGame,
-   reset(n=5,material='dirt',hits=1){gesture=null;World.clear(eng.world,false);Engine.clear(eng);bs.clear();grid.clear();miners.clear();removedTerrain.clear();terrainDamage.clear();inv.dirt=0;inv.stone=0;stone=true;cam.x=80;cam.y=48;cam.z=1;
-    for(let y=0;y<n;y++)for(let x=0;x<n;x++){const z=Bodies.rectangle((x+.5)*B,(y+.5)*B,B,B,{isStatic:true});z.game={terrain:true,material,cx:x,cy:y,w:B,h:B,max:hits,hits:0};bs.add(z);grid.set(key(x,y),z)}
-    ui()
-   },remaining(){return [...bs].filter(z=>z.game.terrain).map(z=>({x:z.game.cx,y:z.game.cy,hits:z.game.hits}))},
-   paint(a,b){const g={t:'pick',a,b,moved:true};pickaxeDragV39(g,0);return g}
-  };`;
-  await route.fulfill({response,body:source.replace('restoreDynamicState(initialSave);','restoreDynamicState(initialSave);'+hook)});
- });
- const url=process.env.SKY_TEST_URL||'http://127.0.0.1:8767/sky-stack/';
- const load=async()=>{await page.goto(url);await page.waitForFunction(()=>window.pickTest,null,{polling:100})};await load();
- const point=async(x,y)=>page.evaluate(([x,y])=>pickTest.screen(x,y),[x,y]);
- const tap=async(x,y)=>{const p=await point(x,y);await page.mouse.click(p.x,p.y)};
- assert.equal(await page.evaluate(()=>pickTest.tier),0);
- await page.evaluate(()=>pickTest.reset());await tap(16,16);
- assert.equal(await page.evaluate(()=>pickTest.counts.dirt),1,'basic pick mines one block');
- await page.evaluate(()=>pickTest.reset());let a=await point(16,16);await page.mouse.move(a.x,a.y);await page.mouse.down();await page.mouse.move(a.x+120,a.y,{steps:6});await page.mouse.up();
- assert.equal(await page.evaluate(()=>pickTest.counts.dirt),0,'basic drag pans instead of mining');
- console.log('PASS basic stone pick retains single-block mining and drag-to-pan');
- await page.evaluate(()=>pickTest.goldTo(4));await page.locator('#pickaxeUpgrade').click();assert.ok(await page.locator('#pickaxeBuy').isDisabled());await page.locator('#pickaxeClose').click();
- for(const [tier,cost,size] of [[1,5,2],[2,20,3],[3,50,4]]){
-  await page.evaluate(n=>pickTest.goldTo(n),cost);await page.locator('#pickaxeUpgrade').click();await page.locator('#pickaxeBuy').click();
-  assert.equal(await page.evaluate(()=>pickTest.tier),tier);assert.equal(await page.evaluate(()=>pickTest.gold),0);
-  await page.evaluate(()=>pickTest.reset());await tap(size===2?16:48,size===2?16:48);
-  assert.equal(await page.evaluate(()=>pickTest.counts.dirt),size*size,`${size} by ${size} footprint`);
-  assert.equal(await page.evaluate(()=>pickTest.remaining().length),25-size*size);
-  await page.evaluate(()=>pickTest.save());await load();assert.equal(await page.evaluate(()=>pickTest.tier),tier,'tier persists on reload');
-  console.log(`PASS tier ${tier}, ${cost}-gold purchase, ${size}×${size} footprint, and save restoration`);
- }
- await page.locator('#pickaxeUpgrade').click();assert.ok(await page.locator('#pickaxeBuy').isDisabled());assert.equal(await page.locator('#pickaxeShop button').count(),2,'no downgrade action');await page.locator('#pickaxeClose').click();
- await page.evaluate(()=>pickTest.reset(12));const before=await page.evaluate(()=>pickTest.camera);a=await point(48,48);const b=await point(240,48);
- await page.mouse.move(a.x,a.y);await page.mouse.down();await page.mouse.move(b.x,b.y);await page.mouse.up();
- assert.ok(await page.evaluate(()=>pickTest.counts.dirt)>=40,'fast drag fills intervening brush cells');
- assert.deepEqual(await page.evaluate(()=>pickTest.camera),before,'upgraded mining does not pan');
- console.log('PASS drag interpolation, fixed camera, max tier and no downgrade');
- await page.evaluate(()=>pickTest.reset(5,'stone',3));a=await point(48,16);await page.mouse.move(a.x,a.y);await page.mouse.down();await page.mouse.move(a.x+12,a.y);await page.waitForTimeout(1100);await page.mouse.up();
- assert.ok(await page.evaluate(()=>pickTest.counts.stone)>0,'holding after a drag repeats swings on hard blocks');
- await page.evaluate(()=>pickTest.reset(5,'bedrock',Infinity));await tap(48,48);assert.equal(await page.evaluate(()=>pickTest.remaining().length),25,'bedrock stays protected');
- console.log('PASS repeated swings and bedrock protection');
- // Cancellation clears a stroke; touch pinch must continue to consume both pointers.
- await page.evaluate(()=>pickTest.reset());a=await point(48,48);
- await page.evaluate(p=>{const c=document.getElementById('game');for(const type of ['pointerdown','pointercancel'])c.dispatchEvent(new PointerEvent(type,{pointerId:99,pointerType:'touch',clientX:p.x,clientY:p.y,bubbles:true,cancelable:true}))},a);
- assert.equal(await page.evaluate(()=>pickTest.counts.dirt),0);
- await page.evaluate(p=>{const c=document.getElementById('game');for(const [type,id,dx] of [['pointerdown',91,0],['pointerdown',92,80],['pointermove',92,110],['pointerup',91,0],['pointerup',92,110]])c.dispatchEvent(new PointerEvent(type,{pointerId:id,pointerType:'touch',clientX:p.x+dx,clientY:p.y,bubbles:true,cancelable:true}))},a);
- assert.equal(await page.evaluate(()=>pickTest.counts.dirt),0,'pinching does not mine');
- console.log('PASS cancellation and two-finger pinch safety');
- await page.setViewportSize({width:390,height:844});await page.locator('#pickaxeUpgrade').click();await page.screenshot({path:'/tmp/sky-pickaxe-mobile.png'});
- const bounds=await page.locator('#pickaxeShop').boundingBox();assert.ok(bounds.x>=0&&bounds.x+bounds.width<=390);
- assert.deepEqual(errors,[]);console.log('PASS mobile upgrade panel and no runtime errors');
+ await page.addInitScript(()=>{window.requestAnimationFrame=()=>0;const interval=window.setInterval;window.setInterval=(fn,ms,...args)=>ms===8?0:interval(fn,ms,...args)});
+ await page.route('**/game-v8-part3.txt*',async route=>{const response=await route.fetch(),source=await response.text();await route.fulfill({response,body:source.replace('restoreDynamicState(initialSave);',`restoreDynamicState(initialSave);window.pickTest={
+ get tier(){return pickaxeTier},get owned(){return pickaxeOwnedTier},get gold(){return inv.gold},get counts(){return {...inv}},get camera(){return {...cam}},get g(){return gesture},
+ goldTo(n){inv.gold=n;ui()},screen:w2s,save:saveGame,equip:equipPickV49,pulse:pulsePickV49,begin:beginPickV49,strike:strikePickV49,finish:finishPickV49,brush:pickaxeBrushV39,render:()=>loop(performance.now()),
+ clock(slot){SkyAudio.rhythm=()=>({ready:true,beatIndex:Math.floor(slot/4),phase:(slot%4)/4,beatMs:60000/72})},
+ down(p){gesture={t:'pick',a:p,b:p,moved:false};beginPickV49(gesture)},move(p){gesture.b=p;gesture.moved=true},cancel(){gesture=null;pickPendingV49=null},
+ reset(n=8,material='dirt',hits=1){gesture=null;pickPendingV49=null;pickLastSlotV49=-Infinity;pickClockModeV49=null;World.clear(eng.world,false);Engine.clear(eng);bs.clear();grid.clear();miners.clear();structuresV46=[];structureBodiesV47.clear();removedTerrain.clear();terrainDamage.clear();inv.dirt=0;inv.stone=0;stone=true;cam.x=112;cam.y=80;cam.z=1;
+ for(let y=0;y<n;y++)for(let x=0;x<n;x++){const z=mk(ctr(x),ctr(y),material,{static:true,terrain:true,cx:x,cy:y});z.game.max=hits;z.game.hits=0}ui()},
+ remaining(){return [...bs].filter(z=>z.game.terrain).map(z=>({x:z.game.cx,y:z.game.cy,hits:z.game.hits}))}
+ };`)});});
+ const load=async()=>{await page.goto(process.env.SKY_TEST_URL||'http://127.0.0.1:8767/sky-stack/');await page.waitForFunction(()=>window.pickTest,null,{polling:100})};await load();
+ await page.locator('[data-tool=pick]').click();assert.equal(await page.locator('#pickaxeShop').evaluate(e=>e.open&&!e.matches(':modal')),true);assert.equal(await page.locator('#pickaxeUpgrade').isVisible(),false);
+ await page.evaluate(()=>pickTest.goldTo(4));assert.ok(await page.locator('#pickaxeBuy').isDisabled());await page.locator('#pickaxeClose').click();
+ for(const [tier,cost] of [[1,5],[2,20],[3,50]]){await page.evaluate(n=>pickTest.goldTo(n),cost);await page.locator('[data-tool=pick]').click();await page.locator('#pickaxeBuy').click();assert.deepEqual(await page.evaluate(()=>[pickTest.tier,pickTest.owned,pickTest.gold]),[tier,tier,0])}
+ await page.locator('[data-tool=pick]').click();await page.locator('#equip-pick-0').click();assert.equal(await page.evaluate(()=>pickTest.tier),0);await load();assert.deepEqual(await page.evaluate(()=>[pickTest.tier,pickTest.owned]),[0,3]);await page.locator('[data-tool=pick]').click();await page.locator('#equip-pick-2').click();assert.deepEqual(await page.evaluate(()=>[pickTest.tier,pickTest.owned]),[2,3]);
+ console.log('PASS toolbar pick inventory, sequential purchases, free swapping and independent saved ownership');
+ // One square per music subdivision, with no interpolated swath or pointer-event acceleration.
+ for(const [tier,size] of [[0,1],[1,2],[2,3],[3,4]])await page.evaluate(({tier,size})=>{const t=pickTest;t.equip(tier);t.reset();t.clock(0);const p={x:(Math.floor((size-1)/2)+.5)*32,y:(Math.floor((size-1)/2)+.5)*32};t.down(p);t.pulse();if(t.counts.dirt)throw Error('Mined before boundary');t.clock(1);t.pulse();if(t.counts.dirt!==size*size)throw Error('Wrong area '+tier);t.move({x:p.x+4*32,y:p.y});for(let i=0;i<20;i++)t.pulse();if(t.counts.dirt!==size*size)throw Error('Pointer speed adds swings');t.clock(2);t.pulse();if(t.counts.dirt!==2*size*size)throw Error('Stroke interpolated outside square');t.clock(20);t.pulse();if(t.counts.dirt!==2*size*size)throw Error('Replayed skipped ticks');t.cancel()},{tier,size});
+ console.log('PASS 1x1/2x2/3x3/4x4 exact squares, clock boundaries and no fast-drag widening');
+ await page.evaluate(()=>{const t=pickTest;t.equip(2);t.reset(8,'stone',3);t.clock(0);t.down({x:48,y:48});for(let slot=1;slot<=2;slot++){t.clock(slot);t.pulse();const hits=t.remaining().filter(z=>z.hits);if(hits.length!==9||hits.some(z=>z.hits!==slot)||t.counts.stone)throw Error('Uneven square hardness')}t.clock(3);t.pulse();if(t.counts.stone!==9)throw Error('Stone hardness/output');t.cancel();t.reset(8,'bedrock',1);t.clock(0);t.down({x:48,y:48});t.clock(1);t.pulse();if(t.remaining().length!==64)throw Error('Bedrock broken');t.cancel();t.reset();t.clock(0);t.down({x:144,y:144});t.clock(1);t.pulse();if(t.counts.dirt)throw Error('Buried square mined through wall');t.cancel()});
+ console.log('PASS all nine stone cells damage together, material hardness and buried/bedrock protection');
+ // Actual mouse drag on the basic pick mines without panning, and holding keeps swinging.
+ await page.evaluate(()=>{pickTest.equip(0);pickTest.reset();pickTest.clock(0)});const camera=await page.evaluate(()=>pickTest.camera);let p=await page.evaluate(()=>pickTest.screen(16,16));await page.mouse.move(p.x,p.y);await page.mouse.down();await page.mouse.move(p.x+64,p.y,{steps:6});await page.evaluate(()=>{pickTest.clock(1);pickTest.pulse()});assert.equal(await page.evaluate(()=>pickTest.counts.dirt),1);await page.mouse.move(p.x+96,p.y);await page.evaluate(()=>{pickTest.clock(2);pickTest.pulse()});await page.mouse.up();assert.equal(await page.evaluate(()=>pickTest.counts.dirt),2);assert.deepEqual(await page.evaluate(()=>[pickTest.camera.x,pickTest.camera.y]),[camera.x,camera.y]);
+ await page.evaluate(()=>{pickTest.reset();pickTest.clock(0)});p=await page.evaluate(()=>pickTest.screen(16,16));await page.mouse.click(p.x,p.y);assert.equal(await page.evaluate(()=>pickTest.counts.dirt),0);await page.evaluate(()=>{pickTest.clock(1);pickTest.pulse()});assert.equal(await page.evaluate(()=>pickTest.counts.dirt),1);
+ console.log('PASS mouse drag and short tap quantization; starter pick no longer pans');
+ await page.setViewportSize({width:390,height:844});await page.locator('[data-tool=pick]').click();await page.evaluate(()=>pickTest.render());await page.screenshot({path:'/tmp/sky-pickaxes-mobile.png'});const box=await page.locator('#pickaxeShop').boundingBox();assert.ok(box.x>=0&&box.x+box.width<=390);await page.locator('#equip-pick-1').click();
+ const cdp=await page.context().newCDPSession(page),touch=async(type,points)=>cdp.send('Input.dispatchTouchEvent',{type,touchPoints:points});await page.evaluate(()=>{pickTest.reset();pickTest.clock(0)});p=await page.evaluate(()=>pickTest.screen(16,16));await touch('touchStart',[{x:p.x,y:p.y,id:1}]);await touch('touchMove',[{x:p.x+32,y:p.y,id:1}]);await page.evaluate(()=>{pickTest.clock(1);pickTest.pulse()});assert.equal(await page.evaluate(()=>pickTest.counts.dirt),4);await touch('touchCancel',[]);await page.evaluate(()=>{pickTest.clock(2);pickTest.pulse()});assert.equal(await page.evaluate(()=>pickTest.counts.dirt),4);
+ await page.evaluate(()=>{pickTest.reset();pickTest.clock(0)});await touch('touchStart',[{x:p.x,y:p.y,id:1}]);await touch('touchStart',[{x:p.x,y:p.y,id:1},{x:p.x+60,y:p.y,id:2}]);await page.evaluate(()=>{pickTest.clock(1);pickTest.pulse()});assert.equal(await page.evaluate(()=>pickTest.counts.dirt),0);await touch('touchEnd',[]);
+ console.log('PASS phone drag, mobile inventory, cancellation and pinch safety');
+
+ // Real Web Audio clock: sustained mining stays on sixteenth boundaries.
+ await load();await page.evaluate(async()=>{await SkyAudio.ensure();window.pickEvents=[];const end=SkyAudio.endPickStroke;SkyAudio.endPickStroke=()=>{pickEvents.push({at:performance.now(),...SkyAudio.rhythm()});end()};pickTest.equip(2);pickTest.reset(8,'stone',100);pickTest.down({x:48,y:48});window.pickLiveTimer=setInterval(()=>pickTest.pulse(),4)});await page.waitForTimeout(1250);
+ const events=await page.evaluate(()=>{clearInterval(pickLiveTimer);pickTest.cancel();return pickEvents});assert.ok(events.length>=4&&events.length<=7);for(let i=1;i<events.length;i++)assert.ok(Math.abs(events[i].at-events[i-1].at-60000/72/4)<40);for(const e of events)assert.ok((e.phase*4)%1<.25,'Late musical subdivision');
+ // Inspect actual created filters, and ensure one square produces one dirt hat.
+ const hats=await page.evaluate(()=>{const proto=AudioContext.prototype,original=proto.createBiquadFilter,filters=[];proto.createBiquadFilter=function(){const node=original.call(this);filters.push(node);return node};try{SkyAudio.beginPickStroke();for(let i=0;i<9;i++)SkyAudio.hit('dirt',true);SkyAudio.endPickStroke();return filters.map(f=>({type:f.type,hz:f.frequency.value}))}finally{proto.createBiquadFilter=original}});assert.deepEqual(hats,[{type:'highpass',hz:6500},{type:'lowpass',hz:12500}]);
+ console.log('PASS live 72 BPM sixteenth timing and one high-frequency hi-hat per dirt square');
+ assert.deepEqual(errors,[]);
  }finally{await browser.close()}
 })().catch(e=>{console.error(e);process.exitCode=1});

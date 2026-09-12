@@ -33,6 +33,8 @@ const pickaxeUrl='game-v39-pickaxe.txt?v=39';
 const treesUrl='game-v41-trees.txt?v=44';
 const spiritsUrl='game-v42-miner-ghosts.txt?v=43';
 const industryUrl='game-v44-industry-resources.txt?v=45';
+const structureArtUrl='game-v46-structure-art.txt?v=46';
+const structuresUrl='game-v46-structures.txt?v=46';
 const tailUrl='game-v8-part3.txt?v=42';
 
 async function read(url){
@@ -65,9 +67,15 @@ async function read(url){
     const trees=await read(treesUrl);
     const spirits=await read(spiritsUrl);
     const industry=await read(industryUrl);
+    const structureArt=await read(structureArtUrl);
+    const structures=await read(structuresUrl);
+    const structuresUi=await read('game-v48-structures-ui.txt?v=48');
+    const pickaxes=await read('game-v49-pickaxes.txt?v=49');
+    const workshopUi=await read('game-v50-workshop-ui.txt?v=50');
+    const keyboard=await read('game-v52-keyboard.txt?v=52');
     const marker='restoreDynamicState(initialSave);';
     if(!tail.includes(marker))throw new Error('v28 insertion marker missing');
-    tail=tail.replace(marker,camera+'\n'+grid+'\n'+zoom+'\n'+miner+'\n'+resources+'\n'+liquidFeel+'\n'+devPanel+'\n'+obsidianArt+'\n'+artDirection+'\n'+pickaxe+'\n'+trees+'\n'+spirits+'\n'+industry+'\n'+marker);
+    tail=tail.replace(marker,camera+'\n'+grid+'\n'+zoom+'\n'+miner+'\n'+resources+'\n'+liquidFeel+'\n'+devPanel+'\n'+obsidianArt+'\n'+artDirection+'\n'+pickaxe+'\n'+trees+'\n'+spirits+'\n'+industry+'\n'+structureArt+'\n'+structures+'\n'+structuresUi+'\n'+pickaxes+'\n'+workshopUi+'\n'+keyboard+'\n'+marker);
 
     const src=core+'\n});\n'+liquid+'\n'+tail;
     (0,eval)(src);

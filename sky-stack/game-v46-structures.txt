@@ -1,0 +1,170 @@
+// Physical structures, per-building production, and anchored construction.
+const STRUCTURES_V46={
+ workshop:{name:'Workshop',w:4,h:4,cost:{wood:5,dirt:5,stone:10},note:'Craft structures for your settlement.'},
+ forge:{name:'Forge',w:3,h:3,cost:{stone:15,wood:5,dirt:5},note:'Smelt ore into refined metal.'},
+ blacksmith:{name:'Blacksmith',w:5,h:4,cost:{wood:15,stone:10,ironIngot:3},note:'Turn iron into construction nails.'}
+};
+const JOBS_V46={
+ workshop:Object.fromEntries(Object.entries(STRUCTURES_V46).map(([k,d])=>[k,{name:d.name,inputs:d.cost,outputs:{[k]:1},duration:5000,structure:true}])),
+ forge:RECIPES_V44,
+ blacksmith:{nails:{name:'10 nails',inputs:{ironIngot:1},outputs:{nails:10},duration:4000}}
+};
+RESOURCE_DEFS_V44.nails={name:'Nails',color:'#c7d4d8',kind:'Construction'};
+inv.nails=Math.max(0,Math.floor(finite(initialSave?.inv?.nails)));
+var structuresV46=[],structureBagV46={workshop:0,forge:0,blacksmith:0},structureIdV46=0,selectedBuildingV46=null;
+var nailModeV46=false,structureDragV46=null,structureLastV46=null,structureUiLastV46=0;
+function saveStructuresV46(){return{bag:{...structureBagV46},nextId:structureIdV46,buildings:structuresV46.map(b=>({...b,job:b.job?{...b.job}:null}))}}
+// Derive collision geometry from opaque sprite pixels, merging equal horizontal
+// runs vertically. Smoke/fire are animated overlays and never become solid.
+const structureShapesV47=new Map(),structureBodiesV47=new Map();
+function structureShapeV47(type){
+ if(structureShapesV47.has(type))return structureShapesV47.get(type);
+ const sprite=structureSpriteV46(type),{width,height}=sprite;
+ const pixels=sprite.getContext('2d').getImageData(0,0,width,height).data;
+ const rectangles=[];let previous=new Map();
+ for(let y=0;y<height;y++){
+  const current=new Map();
+  for(let x=0;x<width;){
+   if(!pixels[(y*width+x)*4+3]){x++;continue}
+   const start=x;while(x<width&&pixels[(y*width+x)*4+3])x++;
+   const key=start+','+x;let r=previous.get(key);
+   if(r)r.h++;else{r={x:start,y,w:x-start,h:1};rectangles.push(r)}
+   current.set(key,r);
+  }
+  previous=current;
+ }
+ structureShapesV47.set(type,rectangles);return rectangles;
+}
+function addStructureBodyV47(b){
+ removeStructureBodyV47(b);
+ const parts=structureShapeV47(b.type).map(r=>Bodies.rectangle(b.x+r.x+r.w/2,b.y+r.y+r.h/2,r.w,r.h,{isStatic:true,friction:.85,restitution:0,slop:.01}));
+ const body=Body.create({parts,isStatic:true,friction:.85,restitution:0,slop:.01,label:'structure-'+b.id});
+ structureBodiesV47.set(b.id,body);World.add(eng.world,body);return body;
+}
+function removeStructureBodyV47(b){const body=structureBodiesV47.get(b.id);if(body){World.remove(eng.world,body);structureBodiesV47.delete(b.id);wake()}}
+function structureOverlapV47(region){return [...structureBodiesV47.values()].some(body=>body.parts.slice(1).some(part=>overlapsV46(region,part.bounds)))}
+function structureAtV47(p){return structuresV46.find(b=>{const body=structureBodiesV47.get(b.id);return body&&Query.point([body],p).length})}
+function fixedV46(z){return z.game?.material!=='leaves'&&z.isStatic&&(z.game?.terrain||z.game?.nailed)}
+function boundsV46(b){const d=STRUCTURES_V46[b.type];return{min:{x:b.x,y:b.y},max:{x:b.x+d.w*B,y:b.y+d.h*B}}}
+function overlapsV46(a,b,pad=1){return a.min.x<b.max.x-pad&&a.max.x>b.min.x+pad&&a.min.y<b.max.y-pad&&a.max.y>b.min.y+pad}
+function adjacentV46(a,b){const x=Math.min(a.max.x,b.max.x)-Math.max(a.min.x,b.min.x),y=Math.min(a.max.y,b.max.y)-Math.max(a.min.y,b.min.y);return(x>2&&Math.min(Math.abs(a.max.y-b.min.y),Math.abs(b.max.y-a.min.y))<2)||(y>2&&Math.min(Math.abs(a.max.x-b.min.x),Math.abs(b.max.x-a.min.x))<2)}
+function supportV46(b,excluded=null){
+ const r=boundsV46(b),segments=[];
+ for(const z of bs)if(z!==excluded&&fixedV46(z)&&Math.abs(z.bounds.min.y-r.max.y)<2)segments.push([z.bounds.min.x-.6,z.bounds.max.x+.6]);
+ segments.sort((a,b)=>a[0]-b[0]);let edge=r.min.x;
+ for(const [a,end] of segments){if(a>edge+.1)break;if(end>=edge)edge=end;if(edge>=r.max.x-.1)return true}return false;
+}
+function validStructureV46(b){
+ const r=boundsV46(b);
+ if(structuresV46.some(other=>overlapsV46(r,boundsV46(other))))return 'Another structure is in the way';
+ if([...bs].some(z=>!z.game?.liquid&&!z.game?.reservoir&&overlapsV46(r,z.bounds)))return 'Clear the space first';
+ if(!supportV46(b))return 'Support the entire base with world or nailed blocks';return '';
+}
+function candidateV46(type,p){const d=STRUCTURES_V46[type],under=at(p);const bottom=under&&fixedV46(under)?Math.round(under.bounds.min.y/B)*B:Math.round(p.y/B)*B;return{type,x:(cell(p.x)-Math.floor(d.w/2))*B,y:bottom-d.h*B}}
+function placeStructureV46(b){if(!structureBagV46[b.type])return false;const error=validStructureV46(b);if(error){toast(error,true);return false}structureBagV46[b.type]--;structuresV46.push({...b,id:++structureIdV46,selected:Object.keys(JOBS_V46[b.type])[0],auto:false,paused:false,job:null});addStructureBodyV47(structuresV46[structuresV46.length-1]);ui();saveGame();SkyAudio.place('stone',1);return true}
+function craftWorkshopV46(){if(!payIndustryV44(STRUCTURES_V46.workshop.cost))return false;structureBagV46.workshop++;ui();saveGame();toast('WORKSHOP READY · DRAG IT INTO THE WORLD');return true}
+function startStructureV46(b){const r=JOBS_V46[b.type][b.selected];if(b.job||b.paused||!r||!payIndustryV44(r.inputs))return false;b.job={recipe:b.selected,remaining:r.duration};return true}
+function stepStructuresV46(elapsed){let changed=false;for(const b of structuresV46){if(b.paused)continue;let budget=b.job?Math.max(0,elapsed):0;for(let n=0;n<64;n++){if(!b.job&&b.auto){if(!startStructureV46(b))break;changed=true}if(!b.job)break;const r=JOBS_V46[b.type][b.job.recipe],used=Math.min(budget,b.job.remaining);b.job.remaining-=used;budget-=used;if(b.job.remaining>1e-7)break;for(const [k,v] of Object.entries(r.outputs)){if(r.structure)structureBagV46[k]+=v;else inv[k]=(inv[k]||0)+v}b.job=null;changed=true}}return changed}
+function packStructureV46(b){removeStructureBodyV47(b);if(b.job){const r=JOBS_V46[b.type][b.job.recipe];for(const [k,v] of Object.entries(r.inputs))inv[k]+=v}structuresV46=structuresV46.filter(x=>x!==b);SkyMachines.remove('structure-'+b.id);structureBagV46[b.type]++;selectedBuildingV46=null;$('buildingPanel').close();ui();saveGame();toast('PACKED AWAY · RESERVED INPUTS RETURNED')}
+function anchoredSetV46(excluded=null){
+ const fixed=[...bs].filter(z=>z!==excluded&&fixedV46(z)),anchored=new Set(fixed.filter(z=>z.game.terrain)),pending=fixed.filter(z=>z.game.nailed);
+ let change=true;while(change){change=false;for(let i=pending.length-1;i>=0;i--)if([...anchored].some(z=>adjacentV46(z.bounds,pending[i].bounds))){anchored.add(pending[i]);pending.splice(i,1);change=true}}return anchored;
+}
+function protectedSupportV46(z){if(!fixedV46(z)||!structuresV46.length)return false;
+ // Most mining is unrelated to foundations: only traverse anchoring if directly involved.
+ if(!structuresV46.some(b=>{const r=boundsV46(b);return Math.abs(z.bounds.min.y-r.max.y)<2&&z.bounds.max.x>r.min.x&&z.bounds.min.x<r.max.x})&&![...bs].some(n=>n.game.nailed&&adjacentV46(n.bounds,z.bounds)))return false;
+ const anchored=anchoredSetV46(z);
+ for(const b of structuresV46){const r=boundsV46(b);for(let x=r.min.x+1;x<r.max.x;x+=B/2)if(![...anchored].some(n=>Math.abs(n.bounds.min.y-r.max.y)<2&&x>=n.bounds.min.x-.6&&x<=n.bounds.max.x+.6))return true}return false;
+}
+const structureMineBaseV46=mine;
+mine=function(p){const z=at(p);if(z&&protectedSupportV46(z))return toast('PACK AWAY THE BUILDING BEFORE REMOVING ITS SUPPORT',true);return structureMineBaseV46(p)};
+const structureTargetBaseV46=minerTargetValidV27;
+minerTargetValidV27=function(q,z){return structureTargetBaseV46(q,z)&&!protectedSupportV46(z)};
+const structureHarvestBaseV46=harvest;
+// Removing a distant world block must not wake every sleeping tower body. The
+// old global wake caused tiny contact corrections to propagate as a shockwave.
+let wakeFocusV51=null;
+const wakeBroadV51=wake;
+wake=function(){
+  const focus=wakeFocusV51;if(!focus)return;
+  const radius=B*1.35;
+  for(const q of bs)if(q.game?.placed&&!q.isStatic&&Math.abs(q.position.x-focus.position.x)<radius&&Math.abs(q.position.y-focus.position.y)<radius)Sleeping.set(q,false);
+};
+harvest=function(z,...args){if(protectedSupportV46(z)){z.game.hits=0;if(z.game.terrain)terrainDamage.delete(key(z.game.cx,z.game.cy));if(args[0]!=='miner')toast('PACK AWAY THE BUILDING BEFORE REMOVING ITS SUPPORT',true);return 0}wakeFocusV51=z;try{const out=structureHarvestBaseV46(z,...args);if(z.game?.nailed||fixedV46(z)){const anchored=anchoredSetV46();for(const n of bs)if(n.game.nailed&&!anchored.has(n)){n.game.nailed=false;Body.setStatic(n,false)}}return out}finally{wakeFocusV51=null}};
+const structureOneBaseV46=one,structureSolidBaseV46=solid;
+function nailedRectV46(m,a,b){
+ const r=rect(a,b,buildLimit()),region={min:{x:r.minx*B,y:r.miny*B},max:{x:(r.maxx+1)*B,y:(r.maxy+1)*B}};
+ if((inv[m]||0)<r.cost||inv.nails<r.cost)return toast('NEED '+r.cost+' '+m.toUpperCase()+' + '+r.cost+' NAILS');
+ if([...bs].some(z=>overlapsV46(region,z.bounds))||structureOverlapV47(region))return toast('SPACE IS OCCUPIED');
+ if(![...bs].some(z=>fixedV46(z)&&adjacentV46(region,z.bounds)))return toast('NAIL BLOCKS BESIDE WORLD OR NAILED BLOCKS');
+ inv[m]-=r.cost;inv.nails-=r.cost;
+ // Individual grid cells make each nail and each support independently mineable.
+ for(let y=r.miny;y<=r.maxy;y++)for(let x=r.minx;x<=r.maxx;x++){const z=mk(ctr(x),ctr(y),m,{placed:true,static:true});z.game.nailed=true}
+ ui();saveGame();SkyAudio.place(m,r.cost);
+}
+one=function(m,p){if(nailModeV46&&M[m])return nailedRectV46(m,p,p);return structureOneBaseV46(m,p)};
+solid=function(m,a,b){if(nailModeV46&&M[m])return nailedRectV46(m,a,b);return structureSolidBaseV46(m,a,b)};
+// All ordinary placements also respect structure interiors.
+const structureAttemptBaseV46=attemptPlacement,structureWorldAttemptBaseV46=attemptWorldPlacementV25;
+attemptPlacement=function(r,commit){if(structureOverlapV47({min:{x:r.minx*B,y:r.miny*B},max:{x:(r.maxx+1)*B,y:(r.maxy+1)*B}}))return toast('A BUILDING OCCUPIES THIS SPACE');return structureAttemptBaseV46(r,commit)};
+attemptWorldPlacementV25=function(r,commit){if(structureOverlapV47({min:{x:r.minx,y:r.miny},max:{x:r.maxx,y:r.maxy}}))return toast('A BUILDING OCCUPIES THIS SPACE');return structureWorldAttemptBaseV46(r,commit)};
+const structureRestoreBaseV46=restoreDynamicState;
+restoreDynamicState=function(s){structureRestoreBaseV46(s);const data=s?.structuresV46;
+ if(data){for(const k of Object.keys(structureBagV46))structureBagV46[k]=Math.max(0,Math.floor(finite(data.bag?.[k])));
+ for(const b of data.buildings||[]){if(!STRUCTURES_V46[b.type]||!Number.isFinite(b.x)||!Number.isFinite(b.y))continue;const jobs=JOBS_V46[b.type],selected=Object.hasOwn(jobs,b.selected)?b.selected:Object.keys(jobs)[0],r=jobs[b.job?.recipe];const restoredId=Number.isSafeInteger(b.id)&&b.id>0&&!structuresV46.some(other=>other.id===b.id)?b.id:structureIdV46+1;structureIdV46=Math.max(structureIdV46,restoredId);structuresV46.push({id:restoredId,type:b.type,x:b.x,y:b.y,selected,auto:false,paused:!!b.paused,job:r&&Number.isFinite(b.job.remaining)?{recipe:b.job.recipe,remaining:clamp(b.job.remaining,0,r.duration)}:null});ensureChunkAtX(b.x);addStructureBodyV47(structuresV46[structuresV46.length-1])}
+ structureIdV46=Math.max(structureIdV46,Math.max(0,Math.floor(finite(data.nextId))));
+ }else if(industryV44.built){structureBagV46.forge++;if(industryV44.job){for(const [k,v] of Object.entries(RECIPES_V44[industryV44.job.recipe].inputs))inv[k]+=v}}
+ industryV44.built=false;industryV44.job=null;industryV44.auto=false;
+};
+// UI is created before restore; legacy controls remain hidden for old integrations.
+$('furnaceBuild').closest('section').hidden=true;
+$('industryPanel').querySelector(':scope > .industryNote').textContent='Build a Workshop to start. Finished structures appear in the house tab; placed shops have their own controls.';
+$('industryPanel').insertAdjacentHTML('beforeend','<section class="workshopStarter"><h3>START YOUR SETTLEMENT</h3><div class="starterArt"></div><h4>Workshop · 4 × 4 blocks</h4><p>5 wood + 5 dirt + 10 stone</p><p>Craft a Workshop, then drag it from Structures into the world. Open it to craft more buildings.</p><button class="btn primary" id="craftWorkshop">CRAFT WORKSHOP</button></section>');
+const starterImageV46=document.createElement('img');starterImageV46.src=structureSpriteV46('workshop').toDataURL();starterImageV46.alt='Timber Workshop with a green tiled roof and outdoor workbench';document.querySelector('.starterArt').append(starterImageV46);
+$('industryPanel').querySelector('.industryResources').insertAdjacentHTML('beforeend','<div class="resourceCard"><span>Construction nails<small>1 per fixed block</small></span><b id="resource-nails">0</b></div>');
+$('bar').insertAdjacentHTML('afterbegin','<button class="slot" id="structuresOpen" aria-label="Structures inventory" aria-haspopup="dialog"><span class="houseIcon" aria-hidden="true">⌂</span><span>STRUCTURES</span><b id="structuresCount">0</b></button>');
+$('app').insertAdjacentHTML('beforeend',`<button class="btn" id="nailToggle" aria-pressed="false">NAILS OFF · 0</button>
+<dialog id="structuresPanel" class="box structurePanel" aria-labelledby="structuresTitle"><header><div><small>YOUR BUILDING INVENTORY</small><h2 id="structuresTitle">STRUCTURES</h2></div><button class="btn" id="structuresClose" aria-label="Close structures">✕</button></header><p>Drag a building into the world. Release on a fully supported foundation.</p><div id="structureCards"></div><p class="structureNote">World blocks and nailed blocks support buildings. Craft your first Workshop in Industry.</p></dialog>
+<dialog id="buildingPanel" class="box structurePanel" aria-labelledby="buildingTitle"><header><div><small id="buildingEyebrow"></small><h2 id="buildingTitle"></h2></div><button class="btn" id="buildingClose" aria-label="Close building">✕</button></header><div id="buildingHero"></div><p id="buildingNote"></p><label for="buildingRecipe">CRAFT</label><select id="buildingRecipe"></select><p id="buildingIngredients"></p><progress id="buildingProgress" max="1" value="0"></progress><p id="buildingStatus" role="status"></p><div class="buildingActions"><button class="btn primary" id="buildingProduce">CRAFT</button><button class="btn" id="buildingPause">PAUSE</button></div><p class="structureNote">Finished items go straight to your inventory. Production pauses while away.</p><button class="btn" id="buildingPack">PACK AWAY</button><p class="structureNote">Packing returns the structure and any reserved ingredients.</p></dialog><div id="structureDragHint" hidden></div>`);
+const labelV46=k=>STRUCTURES_V46[k]?.name||RESOURCE_DEFS_V44[k]?.name||k;
+const costTextV46=cost=>Object.entries(cost).map(([k,n])=>n+' '+labelV46(k)+' ('+(inv[k]||0)+')').join(' + ');
+function refreshStructuresV46(){
+ $('structuresCount').textContent=Object.values(structureBagV46).reduce((a,b)=>a+b,0);$('nailToggle').textContent='NAILS '+(nailModeV46?'ON':'OFF')+' · '+inv.nails;$('nailToggle').setAttribute('aria-pressed',String(nailModeV46));$('craftWorkshop').disabled=!canPayIndustryV44(STRUCTURES_V46.workshop.cost);
+ for(const [k,n] of Object.entries(structureBagV46)){const card=$('structure-card-'+k);if(card){card.querySelector('b').textContent=n+' IN INVENTORY';card.disabled=!n}}
+ const b=structuresV46.find(x=>x.id===selectedBuildingV46);if(!b||!$('buildingPanel').open)return;refreshWorkshopGridV50(b);const r=JOBS_V46[b.type][b.selected];$('buildingIngredients').textContent=costTextV46(r.inputs)+' → '+r.name+' · '+r.duration/1000+'s';$('buildingRecipe').disabled=!!b.job;$('buildingRecipe').value=b.selected;
+ $('buildingProgress').value=b.job?1-b.job.remaining/JOBS_V46[b.type][b.job.recipe].duration:0;$('buildingProduce').disabled=!!b.job||b.paused||!canPayIndustryV44(r.inputs);$('buildingPause').disabled=!b.job&&!b.auto;$('buildingPause').textContent=b.paused?'RESUME':'PAUSE';
+ $('buildingStatus').textContent=b.paused?'Paused · ingredients reserved':b.job?'Crafting '+JOBS_V46[b.type][b.job.recipe].name+' · '+(b.job.remaining/1000).toFixed(1)+'s':b.type==='workshop'?'Choose a structure to craft':canPayIndustryV44(r.inputs)?'Ready to craft':(b.auto?'Waiting for ':'Need ')+Object.entries(r.inputs).filter(([k,n])=>(inv[k]||0)<n).map(([k])=>labelV46(k)).join(', ');
+}
+function openBuildingV46(b){selectedBuildingV46=b.id;gesture=null;pointers.clear();$('buildingTitle').textContent=STRUCTURES_V46[b.type].name;$('buildingEyebrow').textContent='BUILDING '+b.id+' · '+STRUCTURES_V46[b.type].w+' × '+STRUCTURES_V46[b.type].h+' BLOCKS';$('buildingNote').textContent=STRUCTURES_V46[b.type].note;$('buildingHero').replaceChildren(structureSpriteV46(b.type).cloneNode());const canvas=$('buildingHero').firstChild;canvas.getContext('2d').drawImage(structureSpriteV46(b.type),0,0);$('buildingRecipe').innerHTML=Object.entries(JOBS_V46[b.type]).map(([k,r])=>'<option value="'+k+'">'+r.name+'</option>').join('');prepareWorkshopGridV50(b);$('buildingPanel').showModal();refreshStructuresV46()}
+for(const [k,d] of Object.entries(STRUCTURES_V46)){
+ const button=document.createElement('button');button.id='structure-card-'+k;button.className='structureCard';button.innerHTML='<span>'+d.name+'<small>'+d.w+' × '+d.h+' blocks</small></span><b>0 IN INVENTORY</b>';const art=structureSpriteV46(k);const image=document.createElement('img');image.src=art.toDataURL();image.alt='';image.draggable=false;button.prepend(image);$('structureCards').append(button);
+ button.addEventListener('pointerdown',e=>{if(!structureBagV46[k]||e.button!==0)return;e.preventDefault();gesture=null;pointers.clear();structureDragV46={type:k,start:{x:e.clientX,y:e.clientY},screen:{x:e.clientX,y:e.clientY},moved:false};$('structuresPanel').close();try{button.setPointerCapture(e.pointerId)}catch{}$('structureDragHint').hidden=false;$('structureDragHint').textContent='DRAG '+d.name.toUpperCase()+' INTO THE WORLD · ESC TO CANCEL'});
+}
+function cancelStructureDragV46(){structureDragV46=null;$('structureDragHint').hidden=true}
+document.addEventListener('pointermove',e=>{if(!structureDragV46)return;const d=structureDragV46;d.screen=pos(e);d.moved ||= Math.hypot(e.clientX-d.start.x,e.clientY-d.start.y)>8;d.candidate=candidateV46(d.type,s2w(d.screen.x,d.screen.y));const error=validStructureV46(d.candidate);$('structureDragHint').textContent=error||'RELEASE TO PLACE '+STRUCTURES_V46[d.type].name.toUpperCase();e.preventDefault()},{passive:false});
+document.addEventListener('pointerup',e=>{if(!structureDragV46)return;const d=structureDragV46;cancelStructureDragV46();if(d.moved&&d.candidate&&e.clientY<HH-110){if(!placeStructureV46(d.candidate)){openStructuresV48()}}else{openStructuresV48()}e.preventDefault();e.stopImmediatePropagation()},{capture:true});
+document.addEventListener('pointercancel',cancelStructureDragV46);
+document.addEventListener('keydown',e=>{if(e.key==='Escape')cancelStructureDragV46()});
+// Capture building taps before mining gestures can damage terrain behind the shop.
+var buildingPressV46=null;
+c.addEventListener('pointerdown',e=>{if(structureDragV46)return;const p=s2w(pos(e).x,pos(e).y),b=structureAtV47(p);if(b){if(e.pointerType==='touch')pinchTouchesV26.delete(e.pointerId);buildingPressV46={b,x:e.clientX,y:e.clientY,id:e.pointerId};e.stopImmediatePropagation();c.setPointerCapture(e.pointerId)}},{capture:true});
+c.addEventListener('pointerup',e=>{if(!buildingPressV46||buildingPressV46.id!==e.pointerId)return;const press=buildingPressV46;buildingPressV46=null;if(Math.hypot(e.clientX-press.x,e.clientY-press.y)<8)openBuildingV46(press.b);gesture=null;pointers.clear();e.stopImmediatePropagation()},{capture:true});
+c.addEventListener('pointercancel',()=>{buildingPressV46=null},{capture:true});
+$('structuresOpen').onclick=()=>{gesture=null;pointers.clear();openStructuresV48()};$('structuresClose').onclick=()=>$('structuresPanel').close();$('buildingClose').onclick=()=>$('buildingPanel').close();$('craftWorkshop').onclick=craftWorkshopV46;$('nailToggle').onclick=()=>{nailModeV46=!nailModeV46;ui();toast(nailModeV46?'NAILED BUILDING · 1 NAIL PER BLOCK · GRID SNAPPED':'LOOSE PHYSICS BLOCKS')};
+for(const [id,action] of Object.entries({buildingProduce:b=>startStructureV46(b),buildingPause:b=>b.paused=!b.paused,buildingRecipe:b=>{if(!b.job&&$('buildingRecipe'))b.selected=$('buildingRecipe').value},buildingPack:packStructureV46})){const el=$(id);if(el)el[id==='buildingRecipe'?'onchange':'onclick']=()=>{const b=structuresV46.find(b=>b.id===selectedBuildingV46);if(b){action(b);ui();saveGame()}}}
+const structureUiBaseV46=ui;ui=function(){structureUiBaseV46();refreshStructuresV46()};
+const structureUpdateBaseV46=updateMiners;updateMiners=function(now){structureUpdateBaseV46(now);const elapsed=structureLastV46===null?0:now-structureLastV46;structureLastV46=now;if(!document.hidden&&stepStructuresV46(elapsed>=0&&elapsed<=1500?elapsed:0)){ui();saveGame()}for(const b of structuresV46)SkyMachines.update('structure-'+b.id,{type:'furnace',x:b.x+STRUCTURES_V46[b.type].w*B/2,y:b.y+STRUCTURES_V46[b.type].h*B,active:!!b.job&&!b.paused});if(now-structureUiLastV46>100){refreshStructuresV46();structureUiLastV46=now}};
+document.addEventListener('visibilitychange',()=>{structureLastV46=null});
+const structureDrawBaseV46=draw;
+draw=function(z){structureDrawBaseV46(z);if(z.game.nailed){const s=w2s(z.position.x,z.position.y);ctx.save();ctx.translate(s.x,s.y);ctx.scale(cam.z,cam.z);ctx.fillStyle='#292939';for(const x of [-10,8])for(const y of [-10,8]){ctx.fillRect(x,y,3,3);ctx.fillStyle='#d7dfdf';ctx.fillRect(x,y,2,1);ctx.fillStyle='#292939'}ctx.restore()}};
+const structureBurstsBaseV46=drawGoldBursts;
+drawGoldBursts=function(now){for(const b of structuresV46){const s=w2s(b.x,b.y),d=STRUCTURES_V46[b.type];if(s.x+d.w*B*cam.z<0||s.x>W||s.y+d.h*B*cam.z<0||s.y>HH)continue;ctx.save();ctx.translate(s.x,s.y);ctx.scale(cam.z,cam.z);ctx.imageSmoothingEnabled=false;paintStructureV46(ctx,b,now,!!b.job&&!b.paused);ctx.restore()}structureBurstsBaseV46(now)};
+const structurePreviewBaseV46=preview;
+preview=function(){
+ if(nailModeV46&&M[tool]&&!structureDragV46){
+  const p=gesture?.b||(pickaxeHoverV39?s2w(pickaxeHoverV39.x,pickaxeHoverV39.y):null);
+  if(p){const r=rect(gesture?.a||p,p,buildLimit()),region={min:{x:r.minx*B,y:r.miny*B},max:{x:(r.maxx+1)*B,y:(r.maxy+1)*B}},s=w2s(region.min.x,region.min.y);
+   const valid=(inv[tool]||0)>=r.cost&&inv.nails>=r.cost&&![...bs].some(z=>overlapsV46(region,z.bounds))&&!structureOverlapV47(region)&&[...bs].some(z=>fixedV46(z)&&adjacentV46(region,z.bounds));
+   ctx.save();ctx.fillStyle=valid?'#91d8a0':'#ee8b7c';ctx.globalAlpha=.25;ctx.fillRect(s.x,s.y,r.nx*B*cam.z,r.ny*B*cam.z);ctx.globalAlpha=1;ctx.strokeStyle=ctx.fillStyle;ctx.strokeRect(s.x,s.y,r.nx*B*cam.z,r.ny*B*cam.z);ctx.font='bold 10px monospace';ctx.fillText(r.cost+' BLOCKS + '+r.cost+' NAILS',s.x,s.y-7);ctx.restore()
+  }
+ }else structurePreviewBaseV46();const b=structureDragV46?.candidate;if(!b)return;const s=w2s(b.x,b.y),d=STRUCTURES_V46[b.type],error=validStructureV46(b);ctx.save();ctx.translate(s.x,s.y);ctx.scale(cam.z,cam.z);ctx.imageSmoothingEnabled=false;ctx.globalAlpha=.75;paintStructureV46(ctx,b);ctx.globalAlpha=.2;ctx.fillStyle=error?'#ee696a':'#79dea2';ctx.fillRect(0,0,d.w*B,d.h*B);ctx.globalAlpha=1;ctx.strokeStyle=error?'#ee696a':'#79dea2';ctx.lineWidth=2;ctx.strokeRect(0,0,d.w*B,d.h*B);ctx.restore()};

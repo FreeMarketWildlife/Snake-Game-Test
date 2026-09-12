@@ -17,6 +17,7 @@
   <link rel="stylesheet" href="style-v41-trees.css?v=41">
   <link rel="stylesheet" href="style-v45-audio-controls.css?v=45">
   <link rel="stylesheet" href="style-v44-industry.css?v=45">
+  <link rel="stylesheet" href="style-v46-structures.css?v=50">
 </head>
 <body>
 <div id="app">
@@ -54,16 +55,16 @@
     <div class="tipsTitle"><b>FIELD GUIDE</b><small>Tap a section to open it</small></div>
     <div class="tipsGroups">
       <details open><summary>CONTROLS <span>Move, zoom, camera</span></summary><div class="tipBody">
-        <p><b>MOVE</b> drags around safely. Pinch to zoom.</p><p><b>TOP / DOWN</b> jump between your tower and mine.</p><p><b>GRID</b> switches between snapped and free placement.</p>
+        <p><b>MOVE</b> drags around safely. Pinch to zoom.</p><p><b>WASD / ARROWS</b> pan the map. Hold <b>SHIFT</b> for temporary Grab; release to restore your tool and stop dragging. <b>1–0</b> access toolbar slots from left to right.</p><p>Select the pickaxe to equip your last pick. Click it again to choose another.</p><p><b>TOP / DOWN</b> jump between your tower and mine.</p><p><b>GRID</b> switches between snapped and free placement.</p>
       </div></details>
       <details><summary>MINING &amp; BUILDING <span>Blocks, miners, records</span></summary><div class="tipBody">
-        <p>Tap exposed blocks to mine. Buried blocks must touch open space.</p><p>Upgrade your pick for permanent drag mining: Iron 2×2 costs 5 gold, Steel 3×3 costs 20, and Titanium 4×4 costs 50. Drag or hold after starting a stroke to keep swinging. Use MOVE to pan.</p><p>Miners prioritize blocks within reach, jump and climb toward work, and back away when stuck. They keep earlier mining abilities when upgraded: level 1 mines dirt, level 2 adds stone, and level 3 adds deepslate. Dirt hits on beats 1 and 3; stone on 2 and 4; deepslate on the “and” after 2 and 4.</p><p>Height records must stay stable for 3 seconds before they count.</p>
+        <p>Tap exposed blocks to mine. Buried blocks must touch open space.</p><p>Open the pickaxe toolbar tab to buy or equip a pick: Iron 2×2 costs 5 gold, Steel 3×3 costs 20, and Titanium 4×4 costs 50. Drag or hold with any pick to mine its square on sixteenth-note ticks. Owned picks can be equipped at any time. Use MOVE to pan.</p><p>Miners prioritize blocks within reach, jump and climb toward work, and back away when stuck. They keep earlier mining abilities when upgraded: level 1 mines dirt, level 2 adds stone, and level 3 adds deepslate. Dirt hits on beats 1 and 3; stone on 2 and 4; deepslate on the “and” after 2 and 4.</p><p>Height records must stay stable for 3 seconds before they count.</p>
       </div></details>
       <details><summary>MINER GHOSTS <span>Hazards and revival</span></summary><div class="tipBody">
         <p>Miners drown after 5 seconds with their head underwater, or burn after a short stay in lava. Watch their air and heat bars.</p><p>Their ghosts sway upward with a spooky melody. Tap a ghost with any tool to revive the miner right there in a burst of pixels, keeping its level and pocket gold.</p><p>Revived miners have a brief protective shield. Ghosts wait above the world and save with your game. Gold claimed through the miner menu stays in your inventory.</p>
       </div></details>
       <details><summary>INDUSTRY <span>Ore deposits and smelting</span></summary><div class="tipBody">
-        <p>Exposed terrain can show coal, iron, or copper flecks. Break it to collect both the block and its ore. Miners can mine deposits whenever they can mine the base material.</p><p>Open INDUSTRY to build a Furnace for 10 stone and 5 wood. Each ingot takes one ore, one coal, and four seconds. Auto-repeat waits for supplies; Pause holds the current batch.</p><p>Ore and ingots are stored resources, not tower blocks. Production pauses while you are away. Active Furnaces add a quiet musical pulse to the soundtrack.</p>
+        <p>Exposed terrain can show coal, iron, or copper flecks. Break it to collect both the block and its ore. Miners can mine deposits whenever they can mine the base material.</p><p>Craft a Workshop in STRUCTURES for 5 wood, 5 dirt, and 10 stone. Drag it from the house icon in the toolbar onto a fully supported foundation. Click a placed building to open its shop. Workshops craft Forges and Blacksmiths; Forges smelt one ore + one coal into an ingot; Blacksmiths turn one iron ingot into 10 nails.</p><p>Finished structures go into STRUCTURES; other products go into your inventory. Turn NAILS ON to place fixed blocks at one nail per block, adjacent to world or nailed blocks. Buildings need fixed blocks across their entire base. Pack buildings away before removing their supports. Production pauses while you are away.</p>
       </div></details>
       <details><summary>TREES <span>Wood, leaves, falling trunks</span></summary><div class="tipBody">
         <p>Wood takes two hits to chop. Every trunk block above the cut falls with gravity; you can mine the fallen logs too.</p><p>Unsupported leaves disappear in 1–2 seconds. Mine them first to collect leaf blocks.</p><p>Use WOOD and LEAVES in the toolbar to build. Placed leaf blocks stay put. On phones, swipe the toolbar to see every material.</p>
@@ -81,9 +82,9 @@
   <button class="btn" id="pickaxeUpgrade" aria-haspopup="dialog" aria-controls="pickaxeShop">UPGRADE PICK · 5 GOLD</button>
   <button class="btn" id="industryOpen" aria-haspopup="dialog" aria-controls="industryPanel">⚙ INDUSTRY</button>
   <dialog id="industryPanel" class="box" aria-labelledby="industryTitle">
-    <header><div><small>FROM THE MINE TO THE FURNACE</small><h2 id="industryTitle">INDUSTRY</h2></div><button class="btn" id="industryClose" aria-label="Close Industry">✕</button></header>
+    <header><div><small>FROM THE MINE TO YOUR SETTLEMENT</small><h2 id="industryTitle">INDUSTRY</h2></div><button class="btn" id="industryClose" aria-label="Close Industry">✕</button></header>
     <section aria-label="Industrial resources"><h3>RESOURCES</h3><div class="industryResources">
-      <div class="resourceCard coal"><span class="oreIcon" aria-hidden="true"></span><span>Coal<small>Furnace fuel</small></span><b id="resource-coal">0</b></div>
+      <div class="resourceCard coal"><span class="oreIcon" aria-hidden="true"></span><span>Coal<small>Forge fuel</small></span><b id="resource-coal">0</b></div>
       <div class="resourceCard ironOre"><span class="oreIcon" aria-hidden="true"></span><span>Iron ore<small>Raw mineral</small></span><b id="resource-ironOre">0</b></div>
       <div class="resourceCard copperOre"><span class="oreIcon" aria-hidden="true"></span><span>Copper ore<small>Raw mineral</small></span><b id="resource-copperOre">0</b></div>
       <div class="resourceCard ironIngot"><span class="oreIcon ingot" aria-hidden="true"></span><span>Iron ingot<small>Refined metal</small></span><b id="resource-ironIngot">0</b></div>
@@ -92,8 +93,8 @@
     <section class="furnaceCard" aria-labelledby="furnaceTitle"><h3 id="furnaceTitle"><span aria-hidden="true">▣</span> FURNACE</h3><p id="furnaceCost"></p><button class="btn primary" id="furnaceBuild">BUILD FURNACE · 10 STONE + 5 WOOD</button>
       <div id="furnaceControls" hidden><label for="furnaceRecipe">PRODUCE</label><select id="furnaceRecipe"><option value="ironIngot">Iron ingot</option><option value="copperIngot">Copper ingot</option></select><p id="furnaceIngredients"></p>
         <progress id="furnaceProgress" max="1" value="0" aria-label="Smelting progress"></progress><p id="furnaceStatus" role="status"></p>
-        <div class="furnaceActions"><button class="btn primary" id="furnaceProduce">PRODUCE</button><button class="btn" id="furnacePause">PAUSE</button><label class="autoToggle"><input type="checkbox" id="furnaceAuto"> AUTO-REPEAT</label></div>
-        <p class="industryNote">Inputs are reserved when a batch starts. Auto-repeat waits for supplies; switch it off to finish the current batch only.</p>
+        <div class="furnaceActions"><button class="btn primary" id="furnaceProduce">PRODUCE</button><button class="btn" id="furnacePause">PAUSE</button></div>
+        <p class="industryNote">Inputs are reserved when a batch starts.</p>
       </div>
     </section>
     <p class="industryNote">Progress saves with your world and pauses while you are away. Refined metals are stored for future industry upgrades.</p>
@@ -140,8 +141,8 @@
   <div id="toast" class="hide"></div><div id="load">Loading physics…</div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/matter-js@0.20.0/build/matter.min.js"></script>
-<script src="audio.js?v=45"></script>
-<script src="game-v28.js?v=45"></script>
+<script src="audio.js?v=49"></script>
+<script src="game-v28.js?v=52"></script>
 <script>
 for(const [id,label,fn] of [['musicToggle','MUSIC', 'setMusicEnabled'],['sfxToggle','SFX','setSfxEnabled']])document.getElementById(id).addEventListener('click',async()=>{await window.SkyAudio?.ensure();const on=window.SkyAudio?.[fn](!document.getElementById(id).matches('[aria-pressed=true]'));const b=document.getElementById(id);b.setAttribute('aria-pressed',on);b.textContent=(label==='MUSIC'?'♫ ':'♪ ')+label+' '+(on?'ON':'OFF')});
 </script>

@@ -117,3 +117,43 @@ pause/auto-repeat, both ingots, frame-rate-independent production, mobile layout
 shared camera attenuation, and live chord-matched Furnace audio.
 
 See `../INDUSTRY-V44.md` for file inventory, balance rules, behavior and limitations.
+
+## Physical structures and nails
+
+Run `SKY_TEST_URL=http://127.0.0.1:8767/sky-stack/ node sky-stack/tests/structures-browser.test.cjs`
+with Playwright and Chromium available (`SKY_TEST_BROWSER` may select an executable).
+This replaces global Furnace UI coverage with the Workshop → Forge → Blacksmith
+loop, real mouse and touch inventory dragging, foundation protection, nailed
+construction, per-building production, migration and mobile layout checks.
+The Industry browser suite continues to test ore deposits, harvesting and audio.
+See `../STRUCTURES-V46.md` for the current costs and gameplay rules.
+
+## Swappable picks and sixteenth-note mining — v49
+
+The pickaxe toolbar slot now opens an attached, non-modal inventory. Purchases
+retain all earlier picks; `pickaxeOwnedTier` saves the highest purchased tier
+independently of the equipped `pickaxeTier`. Legacy saves retain earlier picks.
+Every pick supports desktop/mobile drag or hold mining. Each audio sixteenth
+(208.33 ms at 72 BPM) damages one square at the current pointer, with no interpolated
+swath and no replay of missed ticks. Muted/unavailable audio retains the tempo.
+Hardness, material unlocks, bedrock, protected foundations and buried-area rules
+remain in force. Short taps queue one swing; cancelled gestures do not.
+Dirt uses a short high-frequency noise hi-hat. A square groups its material sounds
+so nine dirt blocks produce one hat rather than nine overlapping voices.
+
+`pickaxe-browser.test.cjs` covers ownership/purchase/equip/save, exact square
+footprints, durability, pointer speed, desktop and mobile gestures, pinch/cancel,
+and actual Web Audio subdivision timing and hi-hat filter/grouping behavior.
+
+## Desktop controls — v52
+
+Selecting the pickaxe from another tool equips the last-used pick. Clicking the
+already-selected pickaxe toggles its inventory. WASD and arrow keys pan the camera
+at a consistent screen speed. Number keys 1–0 activate toolbar slots left to right,
+using their normal availability rules. Shift temporarily selects Grab and restores
+the previous tool on release; release also cancels the active drag. Focus loss
+clears held keys, and shortcuts do not intercept form input or modal dialogs.
+
+Run `node sky-stack/tests/keyboard-browser.test.cjs` with Playwright available.
+The browser check exercises all mappings, pick selection, held-key motion, both
+Shift keys, release during dragging, focus loss, and typing in the developer form.

@@ -1,0 +1,56 @@
+// Toolbar-attached Structures inventory. UI art is authored at 32px and shown 1:1.
+function uiPixelV48(kind){
+ const canvas=document.createElement('canvas');canvas.width=canvas.height=32;const g=canvas.getContext('2d');
+ const r=(x,y,w,h,c)=>{g.fillStyle=c;g.fillRect(x,y,w,h)},ink='#272535',gold='#e3ba77',pale='#d2ded6';
+ if(['workshop','forge','blacksmith','house'].includes(kind)){
+  const forge=kind==='forge',smith=kind==='blacksmith';
+  r(2,28,28,3,ink);r(3,28,26,2,'#969aa2');
+  if(forge){r(8,11,17,17,ink);r(10,12,13,15,'#777d88');r(20,3,7,12,ink);r(21,4,5,10,'#9da1a9');r(12,19,9,9,ink);r(14,22,5,5,'#efae60');r(15,24,3,3,'#ffe0a0')}
+  else{r(5,12,23,16,ink);r(7,14,19,14,'#c8aa7b');r(3,11,27,3,ink);for(let y=3;y<12;y+=2){const x=12-y;r(x,y,32-2*x,2,smith?'#bd807d':'#8eae95');r(x,y+1,32-2*x,1,smith?'#704a5b':'#496e65')}r(9,20,6,8,ink);r(10,21,4,7,'#78523f');r(19,16,6,6,ink);r(20,17,4,4,gold);r(21,17,1,4,ink);r(20,19,4,1,ink);if(smith){r(23,2,5,9,ink);r(24,3,3,7,'#8b8e99');r(17,25,8,2,pale)}}
+ }else if(kind==='warning'){r(14,6,4,14,gold);r(14,23,4,4,gold)}else if(kind==='diamond'){for(let i=0;i<9;i++)r(7+i,15-i,18-i*2,2+i*2,'#82d4d8');r(12,11,3,8,'#d4ffeb')}else if(kind==='close'){for(let i=0;i<9;i++){r(11+i,11+i,2,2,pale);r(19-i,11+i,2,2,pale)}}
+ else if(kind==='up'||kind==='down'){for(let i=0;i<6;i++)r(15-i,kind==='up'?9+i:20-i,2+i*2,2,pale)}
+ else if(kind==='grid'){for(let i=7;i<27;i+=6){r(i,7,1,19,pale);r(7,i,19,1,pale)}}
+ else if(kind==='music'){r(12,7,2,17,pale);r(14,7,11,3,pale);r(23,8,2,13,pale);r(7,22,7,4,pale);r(18,19,7,4,pale)}
+ else if(kind==='sound'){r(7,13,5,7,pale);for(let i=0;i<5;i++)r(12+i,13-i,1,7+i*2,pale);r(21,11,2,11,gold);r(25,8,2,17,gold)}
+ else if(kind==='nails'){for(const x of [8,19]){r(x,8,8,3,pale);r(x+3,11,2,15,'#99aab7');r(x+3,26,1,2,pale)}}
+ else if(kind==='gold'||kind==='diamond'){r(10,8,12,17,ink);r(7,12,18,9,ink);r(11,9,10,15,gold);r(8,13,16,7,gold);r(12,11,3,8,'#fff0be')}
+ else if(kind==='lock'){r(10,7,12,12,ink);r(12,9,8,9,pale);r(14,11,4,7,ink);r(9,17,14,10,gold);r(15,20,2,4,ink)}
+ else if(kind==='ironIngot'||kind==='copperIngot'){r(5,15,21,10,ink);r(9,11,16,4,ink);r(10,13,13,3,pale);r(7,17,17,6,kind==='ironIngot'?'#9facb9':'#d29668');r(8,17,15,2,kind==='ironIngot'?pale:'#f2c391')}
+ else{const color=RESOURCE_DEFS_V44[kind]?.color||'#87969e';r(8,8,16,19,ink);r(5,14,22,10,ink);r(10,10,12,15,color);r(7,15,18,7,color);r(10,11,5,3,pale);r(19,18,4,5,'#58616b')}
+ return canvas.toDataURL();
+}
+const panelV48=$('structuresPanel'),triggerV48=$('structuresOpen');
+$('industryOpen').hidden=true;
+panelV48.querySelector('header small').textContent='BUILD • CRAFT • INDUSTRY';
+panelV48.querySelector('header + p').textContent='Drag a building into your world.';
+panelV48.querySelector('.structureNote').remove();
+const starterV48=document.querySelector('.workshopStarter');starterV48.innerHTML='<img src="'+uiPixelV48('workshop')+'" alt=""><div><strong>Craft Workshop</strong><small>5 wood · 5 dirt · 10 stone</small></div><button class="btn primary" id="craftWorkshop">CRAFT</button>';
+panelV48.insertBefore(starterV48,$('structureCards'));
+const resourcesV48=document.createElement('section');resourcesV48.className='structureResources';resourcesV48.innerHTML='<h3>INDUSTRY RESOURCES</h3>';resourcesV48.append($('industryPanel').querySelector('.industryResources'));panelV48.append(resourcesV48);
+for(const [k,d] of Object.entries(RESOURCE_DEFS_V44)){
+ const count=$('resource-'+k),card=count.closest('.resourceCard');card.className='resourceCard';card.replaceChildren();const img=document.createElement('img');img.src=uiPixelV48(k);img.alt='';card.append(img);const label=document.createElement('span');label.textContent=d.name;card.append(label,count);
+}
+for(const [k,d] of Object.entries(STRUCTURES_V46)){$('structure-card-'+k).querySelector('img').src=uiPixelV48(k);$('structure-card-'+k).querySelector('small').textContent=d.w+' × '+d.h+' blocks'}
+triggerV48.querySelector('.houseIcon').textContent='';triggerV48.querySelector('.houseIcon').style.backgroundImage='url('+uiPixelV48('house')+')';
+triggerV48.setAttribute('aria-controls','structuresPanel');triggerV48.setAttribute('aria-expanded','false');
+function positionStructuresV48(){const anchor=triggerV48.getBoundingClientRect(),bar=$('bar').getBoundingClientRect();panelV48.style.left=Math.round(Math.max(8,Math.min(anchor.left,innerWidth-Math.min(368,innerWidth-16)-8)))+'px';panelV48.style.bottom=Math.round(innerHeight-bar.top+8)+'px';panelV48.style.maxHeight=Math.max(160,Math.floor(bar.top-24))+'px'}
+function openStructuresV48(){gesture=null;pointers.clear();positionStructuresV48();if(!panelV48.open)panelV48.show();triggerV48.setAttribute('aria-expanded','true');refreshStructuresV46()}
+triggerV48.onclick=()=>panelV48.open?panelV48.close():openStructuresV48();
+panelV48.addEventListener('close',()=>triggerV48.setAttribute('aria-expanded','false'));
+$('craftWorkshop').onclick=craftWorkshopV46;
+addEventListener('resize',positionStructuresV48);$('bar').addEventListener('scroll',positionStructuresV48,{passive:true});
+document.addEventListener('pointerdown',e=>{if(panelV48.open&&!panelV48.contains(e.target)&&!triggerV48.contains(e.target))panelV48.close()},{capture:true});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&panelV48.open){panelV48.close();triggerV48.focus()}});
+const refreshBeforeV48=refreshStructuresV46;
+refreshStructuresV46=function(){refreshBeforeV48();for(const k of Object.keys(RESOURCE_DEFS_V44))$('resource-'+k).textContent=inv[k];if(panelV48.open)triggerV48.setAttribute('aria-expanded','true')};
+// Use raster icons for controls; labels stay text and remain accessible.
+for(const [id,kind] of Object.entries({structuresClose:'close',buildingClose:'close',pickaxeClose:'close',top:'up',down:'down',gridToggle:'grid',musicToggle:'music',sfxToggle:'sound',nailToggle:'nails'})){
+ const el=$(id);el.classList.add('rasterControl');el.style.setProperty('--control-icon','url('+uiPixelV48(kind)+')');
+ const clean=()=>{const text=el.textContent.replace(/[✕×▲▼▦▱♫♪]/g,'').trim();if(el.textContent!==text)el.textContent=text};clean();new MutationObserver(clean).observe(el,{childList:true,characterData:true,subtree:true});
+}
+for(const el of document.querySelectorAll('.lock')){el.textContent='';el.classList.add('rasterLock');el.style.backgroundImage='url('+uiPixelV48('lock')+')'}
+// Full building portraits retain their native world pixel resolution.
+const openShopBeforeV48=openBuildingV46;openBuildingV46=function(b){panelV48.close();openShopBeforeV48(b)};
+
+for(const [id,kind] of [['goldHud','gold'],['diamondHud','diamond']]){const el=$(id).querySelector('b');for(const node of [...el.childNodes])if(node.nodeType===3)node.textContent='';el.classList.add('pixelCurrency');el.style.setProperty('--currency-icon','url('+uiPixelV48(kind)+')')}
+for(const el of document.querySelectorAll('.warningIcon')){el.textContent='';el.style.backgroundImage='url('+uiPixelV48('warning')+')';el.classList.add('pixelWarning')}

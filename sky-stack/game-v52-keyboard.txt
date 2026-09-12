@@ -1,0 +1,68 @@
+// Desktop controls share the toolbar's existing selection and unlock rules.
+const panKeysV52=new Set(),shiftKeysV52=new Set();
+let temporaryGrabV52=false,returnToolV52=null,keyboardLastV52=null;
+function keyboardBlockedV52(){
+ const el=document.activeElement;
+ return !!(el&&(el.matches('input,textarea,select,[role="textbox"]')||el.isContentEditable))||!!document.querySelector('dialog:modal,.modal.show');
+}
+function markToolV52(){document.querySelectorAll('#bar .slot[data-tool]').forEach(b=>b.classList.toggle('sel',b.dataset.tool===tool))}
+function stopPointerV52(){
+ for(const id of pointers.keys())try{if(c.hasPointerCapture(id))c.releasePointerCapture(id)}catch{}
+ gesture=null;pointers.clear();pickPendingV49=null;buildingPressV46=null;cancelStructureDragV46();
+ cameraReleaseV24();
+}
+function startGrabV52(){
+ if(temporaryGrabV52)return;
+ returnToolV52=tool;temporaryGrabV52=true;tool='move';pickPendingV49=null;cancelStructureDragV46();
+ $('structuresPanel').close();$('pickaxeShop').close();
+ if(gesture){gesture.t='move';gesture.a={...gesture.b};gesture.start={...gesture.last};gesture.moved=false;gesture.shiftGrabV52=true;cameraBeginDragV24()}
+ markToolV52();
+}
+function endGrabV52(){
+ if(!temporaryGrabV52)return;
+ stopPointerV52();tool=returnToolV52||'pick';temporaryGrabV52=false;returnToolV52=null;markToolV52();
+}
+function resetKeyboardV52(){panKeysV52.clear();shiftKeysV52.clear();endGrabV52();keyboardLastV52=null}
+const directionCodesV52=new Set(['KeyW','KeyA','KeyS','KeyD','ArrowUp','ArrowLeft','ArrowDown','ArrowRight']);
+document.addEventListener('keydown',e=>{
+ if(e.ctrlKey||e.metaKey||e.altKey||keyboardBlockedV52())return;
+ if(e.code==='ShiftLeft'||e.code==='ShiftRight'){e.preventDefault();shiftKeysV52.add(e.code);startGrabV52();return}
+ if(directionCodesV52.has(e.code)){e.preventDefault();panKeysV52.add(e.code);return}
+ const digit=/^Digit([0-9])$/.exec(e.code);if(!digit||e.repeat)return;
+ e.preventDefault();const index=digit[1]==='0'?9:Number(digit[1])-1,button=$('bar').querySelectorAll('.slot')[index];if(!button)return;
+ const held=temporaryGrabV52;endGrabV52();stopPointerV52();
+ $('structuresPanel').close();if(button!==pickButtonV49)$('pickaxeShop').close();
+ button.click();button.scrollIntoView({block:'nearest',inline:'nearest'});
+ if(held)startGrabV52();
+});
+document.addEventListener('keyup',e=>{
+ panKeysV52.delete(e.code);
+ if(e.code==='ShiftLeft'||e.code==='ShiftRight'){shiftKeysV52.delete(e.code);if(!shiftKeysV52.size)endGrabV52()}
+});
+addEventListener('blur',resetKeyboardV52);
+document.addEventListener('visibilitychange',()=>{if(document.hidden)resetKeyboardV52()});
+// Capture temporary-grab presses before building/worker click handlers.
+document.addEventListener('pointerdown',e=>{
+ if(!temporaryGrabV52||e.target!==c)return;
+ const s=pos(e),w=s2w(s.x,s.y);pointers.set(e.pointerId,s);
+ gesture={id:e.pointerId,start:s,last:s,a:w,b:w,moved:false,t:'move',shiftGrabV52:true};
+ c.setPointerCapture(e.pointerId);cameraBeginDragV24();
+ e.preventDefault();e.stopImmediatePropagation();
+},{capture:true});
+c.addEventListener('pointerup',e=>{if(gesture?.shiftGrabV52){e.preventDefault();e.stopImmediatePropagation();stopPointerV52()}},{capture:true});
+const cameraBeforeV52=cameraTickV24;
+cameraTickV24=function(now){
+ const dt=keyboardLastV52===null?0:Math.max(0,Math.min(50,now-keyboardLastV52))/1000;keyboardLastV52=now;
+ if(keyboardBlockedV52()){resetKeyboardV52();cameraBeforeV52(now);return}
+ const x=Number(panKeysV52.has('KeyD')||panKeysV52.has('ArrowRight'))-Number(panKeysV52.has('KeyA')||panKeysV52.has('ArrowLeft'));
+ const y=Number(panKeysV52.has('KeyS')||panKeysV52.has('ArrowDown'))-Number(panKeysV52.has('KeyW')||panKeysV52.has('ArrowUp'));
+ if(x||y){
+  const speed=360*dt/cam.z/Math.hypot(x,y),limits=cameraVerticalLimitsV24();
+  cam.anim=false;cameraSpringActiveV24=false;cameraDragVelocityV24=0;
+  cam.x+=x*speed;cam.y=clamp(cam.y+y*speed,limits.min,limits.max);
+  if(gesture){gesture.b=s2w(gesture.last.x,gesture.last.y);if(gesture.t==='move')cameraBeginDragV24()}
+  return;
+ }
+ cameraBeforeV52(now);
+};
+for(const [i,b] of [...$('bar').querySelectorAll('.slot')].entries())if(i<10){const key=i===9?'0':String(i+1);b.setAttribute('aria-keyshortcuts',key);b.title=(b.getAttribute('aria-label')||b.textContent.trim())+' · '+key}

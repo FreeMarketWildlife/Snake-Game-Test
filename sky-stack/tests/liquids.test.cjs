@@ -44,7 +44,7 @@ function tank(s){for(let x=-2;x<=12;x++)s.grid.set(s.key(x,10),true);for(let y=-
  const loader=read('game-v28.js'),urls=[...loader.matchAll(/'([^']+\.txt)\?v=\d+'/g)].map(m=>m[1]);
  const core=urls.slice(0,3).map(read).join(''),liquid=urls.slice(3,15).map(read).join('');
  let tail=read('game-v8-part3.txt').replace(/^\s*\}\);\s*/,'');
- const additions=urls.slice(15,-1).map(read).join('\n');
+ const additions=urls.slice(15).filter(p=>p!=='game-v8-part3.txt').map(read).join('\n');
  tail=tail.replace('restoreDynamicState(initialSave);',additions+'\nrestoreDynamicState(initialSave);');
  new vm.Script(core+'\n});\n'+liquid+'\n'+tail);console.log('PASS production bundle compiles');
 }

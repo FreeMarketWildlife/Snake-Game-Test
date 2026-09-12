@@ -134,7 +134,7 @@ function refreshIndustryV44(){
   const selected=RECIPES_V44[f.selected],active=f.job&&RECIPES_V44[f.job.recipe];
   $('furnaceRecipe').value=f.selected;$('furnaceRecipe').disabled=!!f.job;
   $('furnaceIngredients').textContent=Object.entries(selected.inputs).map(([k,n])=>n+' '+RESOURCE_DEFS_V44[k].name).join(' + ')+' → 1 '+selected.name+' · '+selected.duration/1000+' seconds';
-  $('furnaceAuto').checked=f.auto;$('furnaceProduce').disabled=!!f.job||f.paused||!canPayIndustryV44(selected.inputs);
+  $('furnaceProduce').disabled=!!f.job||f.paused||!canPayIndustryV44(selected.inputs);
   $('furnacePause').disabled=!f.job&&!f.auto;$('furnacePause').textContent=f.paused?'RESUME':'PAUSE';
   $('furnaceProgress').value=f.job?1-f.job.remaining/active.duration:0;
   const missing=Object.entries(selected.inputs).filter(([k,n])=>inv[k]<n).map(([k])=>RESOURCE_DEFS_V44[k].name).join(' and ');
@@ -146,8 +146,8 @@ $('industryClose').onclick=()=>$('industryPanel').close();
 $('industryPanel').addEventListener('close',()=>$('industryOpen').focus());
 $('furnaceBuild').onclick=buildFurnaceV44;
 $('furnaceProduce').onclick=startFurnaceV44;
-$('furnaceRecipe').onchange=e=>{if(!industryV44.job&&Object.hasOwn(RECIPES_V44,e.target.value)){industryV44.selected=e.target.value;ui();saveGame()}};
-$('furnaceAuto').onchange=e=>{industryV44.auto=e.target.checked;ui();saveGame()};
+$('furnaceRecipe')&&($('furnaceRecipe').onchange=e=>{if(!industryV44.job&&Object.hasOwn(RECIPES_V44,e.target.value)){industryV44.selected=e.target.value;ui();saveGame()}});
+$('furnaceAuto')&&($('furnaceAuto').onchange=e=>{industryV44.auto=e.target.checked;ui();saveGame()});
 $('furnacePause').onclick=()=>{industryV44.paused=!industryV44.paused;industryTickV44=null;ui();saveGame()};
 
 // Future positioned machinery uses the same viewport falloff as physical miners.

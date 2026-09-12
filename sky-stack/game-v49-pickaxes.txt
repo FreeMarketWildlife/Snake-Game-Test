@@ -1,0 +1,64 @@
+// Ownership is independent of the equipped tool. Legacy saves own every earlier tier.
+var pickaxeOwnedTier=clamp(Math.floor(finite(initialSave?.pickaxeOwnedTier??initialSave?.pickaxeTier)),0,3);
+pickaxeTier=Math.min(pickaxeTier,pickaxeOwnedTier);
+var pickLastSlotV49=-Infinity,pickPendingV49=null,pickSilentOriginV49=performance.now(),pickClockModeV49=null;
+function pickClockV49(now=performance.now()){
+ const rhythm=window.SkyAudio?.rhythm?.();
+ return rhythm?.ready?{mode:'audio',slot:Math.floor((rhythm.beatIndex+rhythm.phase)*4+1e-7)}:{mode:'silent',slot:Math.floor((now-pickSilentOriginV49)/(60000/(window.SkyAudio?.bpm||72)/4))};
+}
+function beginPickV49(g){if(g.t!=='pick')return;pickPendingV49=null;const clock=pickClockV49();g.pickStartSlot=clock.slot;g.pickClockMode=clock.mode;g.pickSwung=false}
+function finishPickV49(g){if(!g.moved&&!g.pickSwung)pickPendingV49=g}
+function strikePickV49(g){
+ const brush=pickaxeBrushV39(g.b),targets=new Set();
+ for(let y=brush.y;y<brush.y+brush.size;y++)for(let x=brush.x;x<brush.x+brush.size;x++){const z=at({x:ctr(x),y:ctr(y)});if(z?.game&&!z.game.liquid&&!z.game.reservoir)targets.add(z)}
+ // Expose a square as one stroke, rather than letting iteration order trim corners.
+ // Fully buried squares still cannot be mined through an intervening wall.
+ if(![...targets].some(z=>!z.game.terrain||terrainExposed(z)))return;
+ const exposedBefore=terrainExposed;
+ terrainExposed=function(z){return targets.has(z)||exposedBefore(z)};
+ window.SkyAudio?.beginPickStroke?.();
+ try{for(const z of targets){if(!bs.has(z)||z.game.material==='bedrock')continue;mine(z.position)}}
+ finally{terrainExposed=exposedBefore;window.SkyAudio?.endPickStroke?.()}
+ g.pickSwung=true;
+}
+function pulsePickV49(now=performance.now()){
+ if(document.hidden)return;
+ const g=gesture?.t==='pick'?gesture:pickPendingV49;if(!g)return;
+ const clock=pickClockV49(now);
+ if(clock.mode!==g.pickClockMode){g.pickClockMode=clock.mode;g.pickStartSlot=clock.slot;pickClockModeV49=clock.mode;pickLastSlotV49=clock.slot;return}
+ if(clock.slot<=g.pickStartSlot||(clock.mode===pickClockModeV49&&clock.slot<=pickLastSlotV49))return;
+ pickClockModeV49=clock.mode;pickLastSlotV49=clock.slot;
+ strikePickV49(g);if(g===pickPendingV49)pickPendingV49=null;
+}
+// Pointer motion only chooses the next square. It cannot add swings between ticks.
+pickaxeDragV39=function(){};
+setInterval(pulsePickV49,8);
+document.addEventListener('visibilitychange',()=>{gesture=null;pickPendingV49=null});
+c.addEventListener('pointercancel',()=>{pickPendingV49=null},{capture:true});
+const pickIconsV49=pickaxeTiersV39.map((_,i)=>{const old=pickaxeTier;pickaxeTier=i;const icon=artIconV32('pick');pickaxeTier=old;return icon});
+const pickButtonV49=document.querySelector('[data-tool=pick]'),pickPanelV49=$('pickaxeShop');
+$('pickaxeUpgrade').hidden=true;$('pickaxeShopTitle').textContent='PICKAXES';
+for(const note of pickPanelV49.querySelectorAll('.pickaxeNote'))note.remove();
+function equipPickV49(tier){if(!Number.isInteger(tier)||tier<0||tier>pickaxeOwnedTier)return false;pickaxeTier=tier;tool='pick';gesture=null;pickPendingV49=null;document.querySelectorAll('#bar .slot').forEach(b=>b.classList.toggle('sel',b===pickButtonV49));ui();saveGame();pickPanelV49.close();return true}
+refreshPickaxeV39=function(){
+ const current=pickaxeTiersV39[pickaxeTier],next=pickaxeTiersV39[pickaxeOwnedTier+1];
+ $('pickaxeLabel').textContent=current.name.toUpperCase()+' '+current.size+'×'+current.size;
+ pickButtonV49.setAttribute('aria-label',current.name+' pickaxe inventory');pickButtonV49.querySelector('.icon').style.backgroundImage='url('+pickIconsV49[pickaxeTier]+')';
+ $('pickaxeCurrent').textContent='Drag or hold to mine · one square every 1/16 note';
+ $('pickaxeTiers').replaceChildren();
+ for(const [i,t] of pickaxeTiersV39.entries()){
+  const button=document.createElement('button');button.className='pickaxeOwnedRow'+(i===pickaxeTier?' equipped':'');button.id='equip-pick-'+i;button.disabled=i>pickaxeOwnedTier;button.setAttribute('aria-pressed',String(i===pickaxeTier));
+  button.innerHTML='<img src="'+pickIconsV49[i]+'" alt=""><span>'+t.name+'<small>'+t.size+' × '+t.size+' blocks</small></span><b>'+(i===pickaxeTier?'EQUIPPED':i<=pickaxeOwnedTier?'EQUIP':'LOCKED')+'</b>';button.onclick=()=>equipPickV49(i);$('pickaxeTiers').append(button);
+ }
+ $('pickaxeBuy').hidden=!next;$('pickaxeBuy').disabled=!next||inv.gold<next.cost;$('pickaxeBuy').textContent=next?'BUY '+next.name.toUpperCase()+' · '+next.cost+' GOLD':'ALL PICKS OWNED';
+ $('pickaxeFunds').textContent=next?'Gold: '+inv.gold+' · Earlier picks stay in your inventory.':'All picks owned · switch whenever you like.';
+};
+buyPickaxeV39=function(){const next=pickaxeTiersV39[pickaxeOwnedTier+1];if(!next||inv.gold<next.cost)return false;inv.gold-=next.cost;pickaxeOwnedTier++;equipPickV49(pickaxeOwnedTier);SkyAudio.unlock();return true};$('pickaxeBuy').onclick=buyPickaxeV39;
+function positionPickPanelV49(){const a=pickButtonV49.getBoundingClientRect(),bar=$('bar').getBoundingClientRect();pickPanelV49.style.left=Math.round(Math.max(8,Math.min(a.left,innerWidth-Math.min(344,innerWidth-16)-8)))+'px';pickPanelV49.style.bottom=Math.round(innerHeight-bar.top+8)+'px';pickPanelV49.style.maxHeight=Math.max(160,bar.top-24)+'px'}
+function openPickPanelV49(){gesture=null;pickPendingV49=null;tool='pick';$('structuresPanel').close();document.querySelectorAll('#bar .slot').forEach(b=>b.classList.toggle('sel',b===pickButtonV49));ui();positionPickPanelV49();if(!pickPanelV49.open)pickPanelV49.show();pickButtonV49.setAttribute('aria-expanded','true')}
+pickButtonV49.setAttribute('aria-haspopup','dialog');pickButtonV49.setAttribute('aria-controls','pickaxeShop');pickButtonV49.setAttribute('aria-expanded','false');
+$('bar').addEventListener('click',e=>{if(!pickButtonV49.contains(e.target))return;e.stopImmediatePropagation();if(tool!=='pick'){equipPickV49(pickaxeTier);$('structuresPanel').close();return}pickPanelV49.open?pickPanelV49.close():openPickPanelV49()},{capture:true});
+pickPanelV49.addEventListener('close',()=>pickButtonV49.setAttribute('aria-expanded','false'));
+document.addEventListener('pointerdown',e=>{if(pickPanelV49.open&&!pickPanelV49.contains(e.target)&&!pickButtonV49.contains(e.target))pickPanelV49.close()},{capture:true});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){pickPendingV49=null;if(pickPanelV49.open){pickPanelV49.close();pickButtonV49.focus()}}});
+addEventListener('resize',positionPickPanelV49);$('bar').addEventListener('scroll',positionPickPanelV49,{passive:true});

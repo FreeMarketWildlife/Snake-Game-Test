@@ -56,7 +56,7 @@ c.addEventListener('pointermove',e=>{pickaxeHoverV39=pos(e)});
 c.addEventListener('pointerleave',()=>{pickaxeHoverV39=null});
 const pickaxeBasePreviewV39=preview;
 preview=function(){
-  pickaxeBasePreviewV39();if(!pickaxeTier||tool!=='pick'||(!gesture&&!pickaxeHoverV39))return;
+  pickaxeBasePreviewV39();if(tool!=='pick'||(!gesture&&!pickaxeHoverV39))return;
   const p=gesture?.t==='pick'?gesture.b:pickaxeHoverV39?s2w(pickaxeHoverV39.x,pickaxeHoverV39.y):null;if(!p)return;
   const r=pickaxeBrushV39(p),s=w2s(r.x*B,r.y*B),size=r.size*B*cam.z;
   ctx.save();ctx.fillStyle=pickaxeTiersV39[pickaxeTier].color;ctx.globalAlpha=.14;ctx.fillRect(s.x,s.y,size,size);
