@@ -146,7 +146,7 @@
   }
 
   function triggerChapterOneGlitch() {
-    setStatus("ERROR // THREE EXECUTABLES FOUND");
+    setStatus("ERROR // TWO COMBAT ROUTES FOUND");
     let flashes = 0;
     const id = setInterval(() => {
       document.body.style.filter = flashes % 2 ? "hue-rotate(55deg) contrast(1.35)" : "none";
@@ -161,12 +161,12 @@
 
   function renderLab() {
     state.screen = "lab";
-    menuPanel.innerHTML = `${title("PROTOTYPE LAB", "CHAPTER ONE // THREE BUILDS")}
+    menuPanel.innerHTML = `${title("PROTOTYPE LAB", "CHAPTER ONE // TWO BUILDS")}
       <div style="border:1px solid rgba(255,184,74,.4);background:rgba(30,17,30,.78);padding:12px;font-size:9px;line-height:1.55;color:var(--muted)">
         <strong style="color:var(--amber)">ROUTING ANOMALY SAVED.</strong><br>
-        The three Chapter One game experiments can also be launched here at any time.
+        Launch the run-and-gun campaign prototype or the NEXUS first-person prototype.
       </div>
-      <div class="nav-row"><button class="small-btn" id="openLab">OPEN THE THREE SIMULATIONS</button><button class="small-btn" data-go="home">&lt; BACK</button></div>`;
+      <div class="nav-row"><button class="small-btn" id="openLab">CHOOSE COMBAT ROUTE</button><button class="small-btn" data-go="home">&lt; BACK</button></div>`;
     document.getElementById("openLab").addEventListener("click", () => modePicker.classList.remove("hidden"));
     bindGeneric();
     setStatus("LAB ACCESS // UNSAFE BUILDS PRESENT");
