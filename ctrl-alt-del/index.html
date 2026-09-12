@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#090713" />
+  <title>CTRL ALT DEL — Menu Prototype</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <canvas id="cityCanvas" width="320" height="180" aria-hidden="true"></canvas>
+  <div class="vignette" aria-hidden="true"></div>
+  <div class="scanlines" aria-hidden="true"></div>
+  <div class="signal-noise" aria-hidden="true"></div>
+
+  <div class="shell">
+    <header class="topbar">
+      <div class="broadcast-chip">
+        <span class="live-dot"></span>
+        <span>RESISTANCE SIGNAL // SKYVIEW</span>
+      </div>
+      <div class="system-state">
+        <span>NEXUS LINK</span>
+        <strong class="danger">SEVERED</strong>
+      </div>
+    </header>
+
+    <main class="layout">
+      <section class="brand-panel" aria-label="Ctrl Alt Del title">
+        <p class="eyebrow">THE WALKING RED FLAGS PRESENT</p>
+        <h1 class="logo" aria-label="Ctrl Alt Del">
+          <span class="key cyan">CTRL</span>
+          <span class="key pink">ALT</span>
+          <span class="key amber">DEL</span>
+        </h1>
+        <p class="tagline">BREAK THE SYSTEM. SURVIVE THE SIGNAL.</p>
+        <div class="story-tag">
+          <span>CAMPAIGN</span>
+          <span>PLATFORMER SHOOTER</span>
+          <span>NO MAGIC // JUST MACHINES</span>
+        </div>
+      </section>
+
+      <section class="menu-panel">
+        <nav id="mainMenu" class="main-menu" aria-label="Main menu">
+          <button class="menu-button primary" data-screen="continue">CONTINUE</button>
+          <button class="menu-button" data-screen="new-game">NEW GAME</button>
+          <button class="menu-button" data-screen="episodes">EPISODE SELECT</button>
+          <button class="menu-button" data-screen="chapters">CHAPTER SELECT</button>
+          <button class="menu-button" data-screen="options">OPTIONS</button>
+          <button class="menu-button" data-screen="extras">EXTRAS</button>
+          <button class="menu-button" data-screen="credits">CREDITS</button>
+        </nav>
+
+        <div id="contentPanel" class="content-panel hidden" aria-live="polite"></div>
+      </section>
+    </main>
+
+    <aside class="intel-card" id="intelCard">
+      <div class="intel-header">
+        <span>FIELD INTEL</span>
+        <span class="tiny-status">ENCRYPTED</span>
+      </div>
+      <div class="intel-body">
+        <div class="portrait-grid" aria-hidden="true">
+          <div class="portrait jessie"><span>J</span></div>
+          <div class="portrait jane"><span>J</span></div>
+        </div>
+        <div>
+          <p class="intel-title">JESSIE + JANE</p>
+          <p class="intel-copy">Two twenty-somethings against a state run by the NEXUS. Blasters hot. Cameras everywhere.</p>
+        </div>
+      </div>
+      <div class="intel-footer">
+        <span>LOCATION: SKYVIEW</span>
+        <span>THREAT: EXTREME</span>
+      </div>
+    </aside>
+
+    <footer class="footerbar">
+      <div class="controls-hint"><kbd>↑</kbd><kbd>↓</kbd> NAVIGATE <kbd>ENTER</kbd> SELECT <kbd>ESC</kbd> BACK</div>
+      <div class="ticker"><span id="tickerText">NEXUS CURFEW ACTIVE // UNAUTHORIZED TRANSMISSION DETECTED // STAY OFF THE GRID //</span></div>
+      <div class="build">MENU PROTOTYPE // BUILD 0.1</div>
+    </footer>
+  </div>
+
+  <template id="episodeCardTemplate">
+    <button class="episode-card">
+      <div class="episode-art">
+        <span class="episode-number"></span>
+        <span class="episode-lock"></span>
+      </div>
+      <div class="episode-copy">
+        <span class="episode-label"></span>
+        <strong class="episode-title"></strong>
+        <span class="episode-meta"></span>
+      </div>
+    </button>
+  </template>
+
+  <script src="app.js"></script>
+</body>
+</html>
