@@ -2,7 +2,7 @@
 
 Temporary home for the **Ctrl Alt Del** game project while it lives inside `FreeMarketWildlife/Snake-Game-Test`.
 
-This first pass intentionally builds **presentation only**. There is no platforming, shooting, enemy AI, combat, or level implementation yet.
+The project now has a menu-driven campaign shell and two playable Chapter One combat prototypes.
 
 ## Game pitch
 
@@ -39,8 +39,10 @@ Implemented UI:
 - Keyboard navigation
 - Local save of selected episode/chapter and display settings
 - Locked Episode III teaser
+- Chapter One **run-and-gun shooter/platformer** with mobile movement, jumping, a laser blaster, punching, enemy waves and health
+- Chapter One **Doom-style first-person shooter** with mobile joystick movement, drag-to-look, shooting, punching, robot AI and a minimap
 
-The `START CHAPTER` and `RESUME CAMPAIGN` actions deliberately stop at a placeholder. Gameplay comes later.
+The run-and-gun is the core campaign direction. The first-person mode is a secondary gameplay style that can appear when the story calls for it. The earlier one-on-one fighting-game experiment has been removed.
 
 ## Campaign structure
 
@@ -84,4 +86,4 @@ Chapter count and chapter names are intentionally unknown for now. The menu pres
 
 ## Next development phase
 
-Once the menu identity feels right, the next phase should be designed together before implementation. Likely topics include player movement, Jessie/Jane character swapping or roles, blaster combat, enemy archetypes, platforming, checkpoint/save structure, chapter-one level flow, and how music/story scenes integrate with gameplay.
+The next phase is to turn Chapter One from a survival sandbox into a directed level with an opening story scene, checkpoints, a clear objective, Jessie/Jane teamwork, and an ending transition into Chapter Two.
