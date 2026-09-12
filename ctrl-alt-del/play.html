@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+  <meta name="theme-color" content="#080610" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>CTRL ALT DEL — Prototype Lab</title>
+  <link rel="stylesheet" href="play.css" />
+</head>
+<body>
+  <div id="rotateGate" class="rotate-gate" aria-hidden="true">
+    <div class="rotate-icon">↻</div>
+    <strong>ROTATE DEVICE</strong>
+    <span>CTRL ALT DEL is built for horizontal play.</span>
+  </div>
+
+  <canvas id="wallpaper" width="480" height="270" aria-hidden="true"></canvas>
+  <div class="crt" aria-hidden="true"></div>
+
+  <main id="menuRoot" class="menu-root">
+    <header class="hud-top">
+      <div><span class="pulse"></span> RESISTANCE SIGNAL // SKYVIEW</div>
+      <div>NEXUS // <b>LINK SEVERED</b></div>
+    </header>
+
+    <section class="hero">
+      <div class="brand-block">
+        <div class="overline">THE WALKING RED FLAG'S PRESENT</div>
+        <h1><span>CTRL</span><span>ALT</span><span>DEL</span></h1>
+        <div class="subline">BREAK THE SYSTEM // SURVIVE THE SIGNAL</div>
+      </div>
+
+      <div id="menuPanel" class="menu-panel"></div>
+    </section>
+
+    <footer class="hud-bottom">
+      <span>BUILD 0.2 // PROTOTYPE LAB</span>
+      <span id="statusText">UNAUTHORIZED BROADCAST DETECTED</span>
+      <span>TOUCH + KEYBOARD</span>
+    </footer>
+  </main>
+
+  <section id="modePicker" class="mode-picker hidden" aria-label="Chapter one prototype selector">
+    <div class="glitch-card">
+      <div class="glitch-kicker">ROUTING ERROR // CHAPTER ONE</div>
+      <h2>THREE VERSIONS OF REALITY DETECTED</h2>
+      <p>The archive cannot decide what kind of game this is. Pick a simulation.</p>
+      <div class="mode-grid">
+        <button class="mode-card platformer" data-mode="platformer">
+          <span class="mode-number">01</span>
+          <strong>SIDE-SCROLLER</strong>
+          <small>2D platformer shooter // rush the robots</small>
+          <span class="mini-scene scene-platformer" aria-hidden="true"></span>
+        </button>
+        <button class="mode-card fps" data-mode="fps">
+          <span class="mode-number">02</span>
+          <strong>NEXUS-DOOM</strong>
+          <small>old-school first-person shooter // cyborg corridors</small>
+          <span class="mini-scene scene-fps" aria-hidden="true"></span>
+        </button>
+        <button class="mode-card fighter" data-mode="fighter">
+          <span class="mode-number">03</span>
+          <strong>BLASTER DUEL</strong>
+          <small>arcade fighting game // steel, fists and lasers</small>
+          <span class="mini-scene scene-fighter" aria-hidden="true"></span>
+        </button>
+      </div>
+      <button id="pickerBack" class="text-button">&lt; RETURN TO CHAPTER ARCHIVE</button>
+    </div>
+  </section>
+
+  <section id="gameShell" class="game-shell hidden" aria-label="Playable prototype">
+    <div class="game-frame">
+      <div class="game-topbar">
+        <div>
+          <button id="exitGame" class="exit-button">×</button>
+          <span id="gameTitle">SIMULATION</span>
+        </div>
+        <div id="gameMeta">CHAPTER ONE // INTRO</div>
+      </div>
+      <canvas id="gameCanvas" width="480" height="270" aria-label="Game prototype canvas"></canvas>
+      <div id="touchControls" class="touch-controls"></div>
+      <div id="gameMessage" class="game-message hidden"></div>
+    </div>
+  </section>
+
+  <script src="prototypes.js"></script>
+  <script src="play.js"></script>
+</body>
+</html>
